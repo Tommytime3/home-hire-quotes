@@ -136,6 +136,7 @@ const STEPS: Step[] = [
       },
     ],
     captures: [
+      { step: "panel_video", title: "Film the panel and the wall around it", hint: "Start a few steps back so we can see where it is, then move in close with the door open. About 10 seconds.", kind: "video", required: true },
       { step: "panel", title: "Photo of the panel with the door open", hint: "Show all the breakers. Don't remove any covers.", kind: "photo", required: true },
       { step: "panel_label", title: "Photo of the main breaker", hint: "The big breaker at the top, usually marked 100 or 200.", kind: "photo", required: true },
       { step: "service_lines", title: "Photo of where power enters the house", hint: "The wires or meter outside, near the panel.", kind: "photo" },

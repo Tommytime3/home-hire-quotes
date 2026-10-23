@@ -60,7 +60,7 @@ create table public.job_media (
   step text not null check (step in (
     'outdoor_unit', 'outdoor_data_plate', 'line_set_route',
     'indoor_unit', 'indoor_data_plate', 'hatch_or_closet_measurement',
-    'panel', 'panel_label', 'service_lines', 'return_grille',
+    'panel_video', 'panel', 'panel_label', 'service_lines', 'return_grille',
     'walkthrough', 'water_heater', 'other')),
   kind text not null check (kind in ('photo', 'video')),
   storage_path text not null,         -- path in the job-media bucket
