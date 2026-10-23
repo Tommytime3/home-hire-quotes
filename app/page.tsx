@@ -394,7 +394,11 @@ export default function CapturePage() {
     setBusy("next");
     try {
       await saveAnswers(isLast);
-      if (isLast) setSubmitted(true);
+      if (isLast) {
+        setSubmitted(true);
+        // Alert the contractor. Fire and forget: the homeowner shouldn't wait on email.
+        if (jobId) supabase.functions.invoke("notify-new-job", { body: { job_id: jobId } }).catch(() => {});
+      }
       else {
         setIndex((i) => i + 1);
         window.scrollTo(0, 0);
