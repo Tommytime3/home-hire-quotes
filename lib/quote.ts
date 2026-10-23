@@ -187,8 +187,10 @@ export function newDraft(job: Record<string, any>, prices: SystemPrice[], items:
   const addonItems = forJob.filter((i) => i.kind === "addon");
 
   const options: QuoteOption[] = TIERS.map((tier) => {
-    const price = prices.find((p) => p.job_type === jobType && p.tier === tier && Number(p.size_tons) === Number(size));
     const picks = pickEquipment(catalog, tier, size, jobType, job.existing_gallons);
+    // Water heaters are priced by tank size (stored in size_tons as gallons); HVAC by tons
+    const priceSize = jobType === "heat_pump_water_heater" ? Number(picks[0]?.gallons ?? 50) : size;
+    const price = prices.find((p) => p.job_type === jobType && p.tier === tier && Number(p.size_tons) === Number(priceSize));
     return {
       tier,
       enabled: !!price || jobType === "heat_pump_water_heater",
@@ -233,6 +235,12 @@ export function pickWaterHeater(catalog: CatalogItem[], tier: Tier, existingGall
   if (!list.length) return null;
   const want = Number(existingGallons) || 50;
   return list.find((c) => Number(c.gallons) >= want) ?? list[list.length - 1];
+}
+
+// Water heater price for a tier at a tank size (permit included). Bigger tanks cost more.
+export function waterHeaterPrice(prices: SystemPrice[], tier: Tier, gallons: number | null | undefined): number | null {
+  const p = prices.find((x) => x.job_type === "heat_pump_water_heater" && x.tier === tier && Number(x.size_tons) === Number(gallons));
+  return p ? Number(p.price) : null;
 }
 
 export function pickEquipment(catalog: CatalogItem[], tier: Tier, size: number, jobType: string, existingGallons?: number | null): CatalogItem[] {

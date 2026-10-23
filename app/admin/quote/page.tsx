@@ -9,7 +9,7 @@ import { EquipmentArt } from "../../../lib/illustrations";
 import { label } from "../../../lib/labels";
 import {
   CatalogItem, PriceItem, QuoteAdder, QuoteDraft, QuoteOption, SystemPrice, TIER_LABEL, TIERS, Tier,
-  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, sizeMismatch, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater,
+  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, sizeMismatch, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater, waterHeaterPrice,
 } from "../../../lib/quote";
 
 const SIZES = [2, 3, 4, 5];
@@ -132,12 +132,18 @@ export default function QuoteBuilder() {
     });
   }
 
+  // Swap the water heater on a card and re-price it for that tank size.
+  function whPatch(o: QuoteOption, wh: CatalogItem | null | undefined): Partial<QuoteOption> {
+    const price = wh ? waterHeaterPrice(prices, o.tier, wh.gallons) : null;
+    return { ...applyPicks(o, wh ? [wh] : []), ...(price != null ? { base_price: price } : {}) };
+  }
+
   // Water heaters: re-pick every tier for a tank size (each brand's next size up).
   function changeTank(gallons: number) {
     setTankFor(gallons);
     setDraft((d) => d && { ...d, options: d.options.map((o) => {
       const wh = pickWaterHeater(catalog, o.tier, gallons);
-      return { ...o, ...applyPicks(o, wh ? [wh] : []) };
+      return { ...o, ...whPatch(o, wh) };
     }) });
   }
 
@@ -307,7 +313,7 @@ export default function QuoteBuilder() {
                   return (
                     <>
                       <label className="lbl">Water heater</label>
-                      <select value={wh?.id ?? ""} onChange={(e) => { const it = catalog.find((c) => c.id === e.target.value); setOpt(o.tier, applyPicks(o, it ? [it] : [])); }}>
+                      <select value={wh?.id ?? ""} onChange={(e) => { const it = catalog.find((c) => c.id === e.target.value); setOpt(o.tier, whPatch(o, it)); }}>
                         <option value="">Choose a water heater…</option>
                         {whChoices.map((c) => (
                           <option key={c.id} value={c.id}>{c.brand} {c.gallons} gal · {c.model_number}{c.tier ? ` (${TIER_LABEL[c.tier]})` : ""}</option>
