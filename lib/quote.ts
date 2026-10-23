@@ -213,7 +213,7 @@ export function newDraft(job: Record<string, any>, prices: SystemPrice[], items:
   if (job.indoor_location === "attic_tight") add("attic_platform");
   if (job.indoor_location === "rooftop") add("crane");
 
-  const permit = Number(items.find((i) => i.code === "permit")?.price ?? 0);
+  const permit = Number(forJob.find((i) => i.code === "permit")?.price ?? 0);
   const svp = /santa\s*clara/i.test(String(job.city ?? ""));
   let rebate = 0;
   let rebate_label = "";
