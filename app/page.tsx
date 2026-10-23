@@ -15,14 +15,16 @@ type Upload = {
 };
 
 type Capture = { step: string; title: string; hint: string; kind: "photo" | "video"; required?: boolean };
-type Choice = { key: string; label: string; options: [string, string][]; required?: boolean; forTypes?: JobType[] };
-type Field = { key: string; label: string; type: "text" | "tel" | "email" | "number"; required?: boolean; forTypes?: JobType[] };
+type Cond = (a: Answers) => boolean;
+type Choice = { key: string; label: string; options: [string, string][]; required?: boolean; forTypes?: JobType[]; showIf?: Cond };
+type Field = { key: string; label: string; type: "text" | "tel" | "email" | "number"; required?: boolean; forTypes?: JobType[]; showIf?: Cond };
 type Zone = { key: string; label: string; required?: boolean; forTypes?: JobType[] };
 type Step = {
   id: string;
   title: string;
   lead: string;
   forTypes?: JobType[];
+  showIf?: Cond;
   fields?: Field[];
   choices?: Choice[];
   zones?: Zone[];
@@ -83,6 +85,38 @@ const STEPS: Step[] = [
         ],
       },
     ],
+  },
+  {
+    id: "systems",
+    title: "Your heating & cooling setup",
+    lead: "Bigger and two-story homes often have more than one system. This helps us quote every part of your home.",
+    forTypes: ["ducted_heat_pump"],
+    choices: [
+      {
+        key: "system_count",
+        label: "How many heating & AC systems does your home have?",
+        required: true,
+        options: [
+          ["1", "One system"],
+          ["2", "Two systems (for example, one upstairs and one downstairs)"],
+          ["3", "Three or more"],
+        ],
+      },
+      {
+        key: "has_mini_splits",
+        label: "Do you also have any wall-mounted mini-splits (ductless units)?",
+        required: true,
+        options: [
+          ["no", "No"],
+          ["yes", "Yes"],
+          ["unsure", "Not sure"],
+        ],
+      },
+    ],
+    fields: [
+      { key: "mini_split_heads", label: "How many wall-mounted units are there?", type: "number", showIf: (a) => a.has_mini_splits === "yes" },
+    ],
+    tip: "On the next screens, show us your main system first. If you have a second one, we'll ask about it after.",
   },
   {
     id: "outdoor",
@@ -170,6 +204,31 @@ const STEPS: Step[] = [
       { key: "door_height_in", label: "Door opening height (inches, if you can)", type: "number" },
     ],
     tip: "The new water heater has to fit through this door, so the width matters. Measure the opening, not the door itself.",
+  },
+  {
+    id: "second_system",
+    title: "Your second system",
+    lead: "Same idea as before, just for your other system. Labels matter most here.",
+    forTypes: ["ducted_heat_pump"],
+    showIf: (a) => Number(a.system_count) >= 2,
+    captures: [
+      { step: "second_system", title: "Film the second indoor unit and the space around it", hint: "About 10 seconds. Show how much room there is around it.", kind: "video" },
+      { step: "second_indoor_data_plate", title: "Photo of the second indoor unit's label", hint: "Usually inside the front panel door.", kind: "photo", required: true },
+      { step: "second_outdoor_data_plate", title: "Photo of the second outdoor unit's label", hint: "The sticker on the side of the second outdoor unit.", kind: "photo" },
+    ],
+    fields: [
+      { key: "second_system_location", label: "Where is the second system? (for example: attic over the bedrooms, outdoor unit on the left side)", type: "text" },
+    ],
+  },
+  {
+    id: "mini_splits",
+    title: "Your mini-splits",
+    lead: "A quick photo of one of your wall-mounted units and its outdoor unit helps us see what you have.",
+    forTypes: ["ducted_heat_pump"],
+    showIf: (a) => a.has_mini_splits === "yes",
+    captures: [
+      { step: "mini_split", title: "Photos of your mini-split units", hint: "One of the wall units, plus the label on its outdoor unit if you can reach it.", kind: "photo" },
+    ],
   },
   {
     id: "panel",
@@ -306,14 +365,16 @@ export default function CapturePage() {
 
   const jobType = (answers.job_type as JobType) || null;
   const steps = useMemo(
-    () => STEPS.filter((s) => !s.forTypes || (jobType && s.forTypes.includes(jobType))),
-    [jobType]
+    () => STEPS.filter((s) => (!s.forTypes || (jobType && s.forTypes.includes(jobType))) && (!s.showIf || s.showIf(answers))),
+    [jobType, answers.system_count, answers.has_mini_splits]
   );
   const step = steps[index];
   const isLast = !!jobType && index === steps.length - 1;
 
-  function visible<T extends { forTypes?: JobType[] }>(items?: T[]): T[] {
-    return (items ?? []).filter((i) => !i.forTypes || (jobType !== null && i.forTypes.includes(jobType)));
+  function visible<T extends { forTypes?: JobType[]; showIf?: Cond }>(items?: T[]): T[] {
+    return (items ?? []).filter(
+      (i) => (!i.forTypes || (jobType !== null && i.forTypes.includes(jobType))) && (!i.showIf || i.showIf(answers))
+    );
   }
 
   function set(key: string, value: string) {

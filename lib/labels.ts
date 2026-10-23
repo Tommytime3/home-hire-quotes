@@ -55,6 +55,8 @@ export const STEP_LABELS: Record<string, string> = {
   indoor_unit: "Indoor unit", indoor_data_plate: "Unit / tank label", hatch_or_closet_measurement: "Opening measurement",
   door_width_measurement: "Door width", panel_video: "Panel video", panel: "Panel (door open)",
   panel_label: "Main breaker", main_panel: "Main panel", service_lines: "Service lines",
+  second_system: "Second system", second_indoor_data_plate: "Second indoor label",
+  second_outdoor_data_plate: "Second outdoor label", mini_split: "Mini-splits",
   return_grille: "Return grille", walkthrough: "Walkthrough", water_heater: "Water heater", other: "Other",
 };
 

@@ -128,6 +128,13 @@ export default function JobPage() {
         <MiniMap marks={marks} />
         {isHvac && <Row k="Indoor unit" v={`${label("indoor_location", job.indoor_location)} · ${ZONE_LABELS[job.indoor_zone] ?? "—"}`} />}
         {isHvac && <Row k="Outdoor unit" v={label("outdoor_location", job.outdoor_location)} />}
+        {job.job_type === "ducted_heat_pump" && (
+          <Row k="Systems" v={[
+            job.system_count && `${job.system_count === 3 ? "3+" : job.system_count} ducted`,
+            job.has_mini_splits === "yes" ? `+ mini-splits${job.mini_split_heads ? ` (${job.mini_split_heads} heads)` : ""}` : job.has_mini_splits === "unsure" ? "mini-splits: not sure" : null,
+          ].filter(Boolean).join(" ")} />
+        )}
+        {job.second_system_location && <Row k="Second system" v={job.second_system_location} />}
         {isWh && <Row k="Water heater" v={`${label("water_heater_location", job.water_heater_location)} · ${ZONE_LABELS[job.water_heater_zone] ?? "—"}`} />}
         {isWh && <Row k="Door opening" v={job.door_width_in ? `${job.door_width_in}" wide${job.door_height_in ? ` × ${job.door_height_in}" tall` : ""}` : null} />}
         <Row k="Panel" v={`${label("panel_location", job.panel_location)} · ${ZONE_LABELS[job.panel_zone] ?? "—"}`} />
