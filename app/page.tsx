@@ -5,7 +5,14 @@ import { supabase, DEFAULT_CONTRACTOR_ID } from "../lib/supabase";
 
 type JobType = "ducted_heat_pump" | "ductless" | "heat_pump_water_heater";
 type Answers = Record<string, string>;
-type Upload = { step: string; name: string; ok: boolean };
+type Upload = {
+  id: string;
+  step: string;
+  kind: "photo" | "video";
+  preview: string;
+  status: "uploading" | "done" | "failed";
+  message?: string;
+};
 
 type Capture = { step: string; title: string; hint: string; kind: "photo" | "video"; required?: boolean };
 type Choice = { key: string; label: string; options: [string, string][] };
@@ -70,7 +77,7 @@ const STEPS: Step[] = [
       },
     ],
     captures: [
-      { step: "outdoor_unit", title: "Film the outdoor unit", hint: "Walk around it slowly, about 15 seconds.", kind: "video" },
+      { step: "outdoor_unit", title: "Film the outdoor unit", hint: "Walk around it slowly, about 10 seconds.", kind: "video" },
       { step: "outdoor_data_plate", title: "Photo of the label on the side", hint: "The sticker with the model and serial number. Get close and make sure it's sharp.", kind: "photo" },
       { step: "line_set_route", title: "Film where the pipes go into the house", hint: "Follow the copper pipes from the unit to the wall.", kind: "video" },
     ],
@@ -143,7 +150,7 @@ const STEPS: Step[] = [
       { key: "steps_condenser_to_indoor", label: "Steps from outdoor unit to indoor unit", type: "number" },
       { key: "steps_indoor_to_panel", label: "Steps from indoor unit to the panel", type: "number" },
     ],
-    captures: [{ step: "walkthrough", title: "Film the walk", hint: "Keep it under 30 seconds. Normal walking pace is fine.", kind: "video" }],
+    captures: [{ step: "walkthrough", title: "Film the walk", hint: "Keep it to about 15 seconds. Normal walking pace is fine.", kind: "video" }],
   },
   {
     id: "ducts",
@@ -205,7 +212,8 @@ export default function CapturePage() {
     for (const f of step.fields ?? []) if (f.required && !answers[f.key]?.trim()) return f.label;
     for (const c of step.choices ?? []) if (step.id === "contact" && !answers[c.key]) return c.label;
     for (const cap of step.captures ?? [])
-      if (cap.required && !uploads.some((u) => u.step === cap.step && u.ok)) return cap.title;
+      if (cap.required && !uploads.some((u) => u.step === cap.step && u.status === "done")) return cap.title;
+    if (uploads.some((u) => u.status === "uploading")) return "wait for uploads to finish";
     return null;
   }
 
@@ -224,32 +232,46 @@ export default function CapturePage() {
     if (error) throw error;
   }
 
-  async function onFile(cap: Capture, files: FileList | null) {
-    if (!files?.length) return;
+  function patchUpload(id: string, patch: Partial<Upload>) {
+    setUploads((list) => list.map((u) => (u.id === id ? { ...u, ...patch } : u)));
+  }
+
+  // `files` must already be a plain array: iPhone Safari empties the input's FileList
+  // as soon as the input is reset, which silently dropped every upload before.
+  async function onFiles(cap: Capture, files: File[]) {
+    if (!files.length) return;
     setError(null);
-    setBusy(cap.step);
+    let id: string;
     try {
-      const id = await ensureJob();
-      for (const file of Array.from(files)) {
-        if (file.size > 50 * 1024 * 1024) {
-          setUploads((u) => [...u, { step: cap.step, name: `${file.name} is too large. Keep videos under 30 seconds.`, ok: false }]);
-          continue;
-        }
-        const ext = file.name.split(".").pop() || (cap.kind === "video" ? "mp4" : "jpg");
+      id = await ensureJob();
+    } catch {
+      setError("Couldn't connect. Check your signal and try again.");
+      return;
+    }
+    for (const file of files) {
+      const uid = newId();
+      const kind: Upload["kind"] = file.type.startsWith("video") ? "video" : "photo";
+      setUploads((u) => [...u, { id: uid, step: cap.step, kind, preview: URL.createObjectURL(file), status: "uploading" }]);
+      if (file.size > 50 * 1024 * 1024) {
+        patchUpload(uid, { status: "failed", message: "Too long. Record 15 seconds or less." });
+        continue;
+      }
+      try {
+        const ext = (file.name.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase();
         const path = `jobs/${id}/${cap.step}-${Date.now()}.${ext}`;
-        const up = await supabase.storage.from("job-media").upload(path, file, { contentType: file.type });
+        const up = await supabase.storage.from("job-media").upload(path, file, { contentType: file.type || undefined });
         if (up.error) throw up.error;
-        const kind = file.type.startsWith("video") ? "video" : "photo";
         const rec = await supabase.from("job_media").insert({ job_id: id, step: cap.step, kind, storage_path: path });
         if (rec.error) throw rec.error;
-        setUploads((u) => [...u, { step: cap.step, name: kind === "video" ? "Video uploaded" : "Photo uploaded", ok: true }]);
+        patchUpload(uid, { status: "done" });
+      } catch {
+        patchUpload(uid, { status: "failed", message: "Didn't upload. Tap to retake." });
       }
-    } catch (e: any) {
-      setError("Upload didn't go through. Check your connection and try again.");
-      setUploads((u) => [...u, { step: cap.step, name: "Upload failed, try again", ok: false }]);
-    } finally {
-      setBusy(null);
     }
+  }
+
+  function removeUpload(id: string) {
+    setUploads((list) => list.filter((u) => u.id !== id));
   }
 
   async function next() {
@@ -274,6 +296,7 @@ export default function CapturePage() {
   if (submitted) {
     return (
       <main className="wrap done">
+        <div className="done-badge" aria-hidden="true">✓</div>
         <h1>You're all set, {answers.first_name}.</h1>
         <p className="lead">
           We're reviewing your photos and videos now. You'll get your quote by text and email, usually the same day.
@@ -282,78 +305,139 @@ export default function CapturePage() {
     );
   }
 
+  const total = jobType ? steps.length : null;
+  const pct = total ? ((index + 1) / total) * 100 : 8;
+
   return (
-    <main className="wrap">
-      <p className="kicker">Step {index + 1} of {steps.length}</p>
-      <div className="progress"><div style={{ width: `${((index + 1) / steps.length) * 100}%` }} /></div>
-      <h1>{step.title}</h1>
-      <p className="lead">{step.lead}</p>
-
-      {step.choices?.map((c) => (
-        <div className="card" key={c.key}>
-          <h2>{c.label}</h2>
-          <div className="chips">
-            {c.options.map(([value, label]) => (
-              <button key={value} type="button" className={`chip ${answers[c.key] === value ? "on" : ""}`} onClick={() => set(c.key, value)}>
-                {label}
-              </button>
-            ))}
-          </div>
+    <>
+      <header className="topbar">
+        <div className="topbar-row">
+          <span className="brand">Home Hire</span>
+          <span className="stepcount">{total ? `Step ${index + 1} of ${total}` : "Getting started"}</span>
         </div>
-      ))}
+        <div className="progress"><div style={{ width: `${pct}%` }} /></div>
+      </header>
 
-      {step.captures?.map((cap) => {
-        const mine = uploads.filter((u) => u.step === cap.step);
-        return (
-          <div className="card" key={cap.step}>
-            <h2>{cap.title}{cap.required ? "" : " (optional)"}</h2>
-            <p>{cap.hint}</p>
-            <label className="capture">
-              <input
-                type="file"
-                accept={cap.kind === "video" ? "video/*" : "image/*"}
-                capture="environment"
-                onChange={(e) => { onFile(cap, e.target.files); e.target.value = ""; }}
-              />
-              {busy === cap.step ? "Uploading..." : cap.kind === "video" ? "Record video" : "Take photo"}
-            </label>
-            {mine.length > 0 && (
-              <div className="thumbs">
-                {mine.map((u, i) => <span key={i} className={`thumb ${u.ok ? "" : "fail"}`}>{u.ok ? "✓ " : ""}{u.name}</span>)}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <main className="wrap">
+        <h1>{step.title}</h1>
+        <p className="lead">{step.lead}</p>
 
-      {step.fields && (
-        <div className="card">
-          {step.fields.map((f) => (
-            <div key={f.key}>
-              <label className="field" htmlFor={f.key}>{f.label}</label>
-              <input
-                id={f.key}
-                type={f.type}
-                inputMode={f.type === "number" ? "numeric" : undefined}
-                value={answers[f.key] ?? ""}
-                onChange={(e) => set(f.key, e.target.value)}
-              />
+        {step.choices?.map((c) => (
+          <section className="card" key={c.key}>
+            <h2>{c.label}</h2>
+            <div className="options">
+              {c.options.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`option ${answers[c.key] === value ? "on" : ""}`}
+                  onClick={() => set(c.key, value)}
+                >
+                  <span className="radio" aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </section>
+        ))}
 
-      {step.tip && <p className="tip">{step.tip}</p>}
-      {error && <p className="warn">{error}</p>}
+        {step.captures?.map((cap) => {
+          const mine = uploads.filter((u) => u.step === cap.step);
+          const done = mine.some((u) => u.status === "done");
+          const uploading = mine.some((u) => u.status === "uploading");
+          return (
+            <section className={`card capture-card ${done ? "complete" : ""}`} key={cap.step}>
+              <div className="capture-head">
+                <span className={`check ${done ? "on" : ""}`} aria-hidden="true">{done ? "✓" : ""}</span>
+                <div>
+                  <h2>{cap.title}</h2>
+                  <span className={`tag ${cap.required ? "req" : ""}`}>{cap.required ? "Required" : "Optional"}</span>
+                </div>
+              </div>
+              <p>{cap.hint}</p>
+
+              {mine.length > 0 && (
+                <div className="shots">
+                  {mine.map((u) => (
+                    <div key={u.id} className={`shot ${u.status}`}>
+                      {u.kind === "video" ? (
+                        <video src={u.preview} muted playsInline preload="metadata" />
+                      ) : (
+                        <img src={u.preview} alt="" />
+                      )}
+                      <span className="shot-status">
+                        {u.status === "uploading" ? "Uploading…" : u.status === "done" ? "✓ Saved" : u.message}
+                      </span>
+                      {u.status === "failed" && (
+                        <button type="button" className="shot-x" aria-label="Remove" onClick={() => removeUpload(u.id)}>×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label className={`capture ${done ? "again" : ""}`}>
+                <input
+                  type="file"
+                  accept={cap.kind === "video" ? "video/*" : "image/*"}
+                  capture="environment"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = "";
+                    onFiles(cap, files);
+                  }}
+                />
+                <span className="capture-icon" aria-hidden="true">{cap.kind === "video" ? "●" : "◉"}</span>
+                {uploading ? "Uploading…" : done ? (cap.kind === "video" ? "Record another" : "Add another photo") : cap.kind === "video" ? "Record video" : "Take photo"}
+              </label>
+            </section>
+          );
+        })}
+
+        {step.fields && (
+          <section className="card">
+            {step.fields.map((f) => (
+              <div className="field-wrap" key={f.key}>
+                <label className="field" htmlFor={f.key}>{f.label}</label>
+                <input
+                  id={f.key}
+                  type={f.type}
+                  inputMode={f.type === "number" ? "numeric" : f.type === "tel" ? "tel" : undefined}
+                  autoComplete={AUTOCOMPLETE[f.key]}
+                  value={answers[f.key] ?? ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              </div>
+            ))}
+          </section>
+        )}
+
+        {step.tip && <p className="tip">{step.tip}</p>}
+        {error && <p className="warn" role="alert">{error}</p>}
+      </main>
 
       <nav className="nav">
         <div className="row">
-          {index > 0 && <button className="secondary" onClick={() => setIndex((i) => i - 1)}>Back</button>}
-          <button className="primary" disabled={!!busy} onClick={next}>
-            {busy === "next" ? "Saving..." : isLast ? "Send for my quote" : "Next"}
+          {index > 0 && (
+            <button className="secondary" onClick={() => { setError(null); setIndex((i) => i - 1); window.scrollTo(0, 0); }}>
+              Back
+            </button>
+          )}
+          <button className="primary" disabled={busy === "next"} onClick={next}>
+            {busy === "next" ? "Saving…" : isLast ? "Send for my quote" : "Next"}
           </button>
         </div>
       </nav>
-    </main>
+    </>
   );
 }
+
+const AUTOCOMPLETE: Record<string, string> = {
+  first_name: "given-name",
+  last_name: "family-name",
+  phone: "tel",
+  email: "email",
+  street: "address-line1",
+  city: "address-level2",
+  zip: "postal-code",
+};

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "Show us your system from your phone and get a real, signable quote.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#f3f5f2" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
