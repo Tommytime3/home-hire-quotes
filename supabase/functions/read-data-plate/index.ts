@@ -102,14 +102,14 @@ Deno.serve(async (req) => {
   }
 
   let q = db.from("job_media").select("id, step, storage_path, ai_status").eq("job_id", jobId).eq("kind", "photo").in("step", PLATE_STEPS);
-  if (!force) q = q.is("ai_status", null);
+  if (!force) q = q.or("ai_status.is.null,ai_status.eq.pending"); // new photos start as "pending"
   const { data: media } = await q.order("created_at");
   const results: any[] = [];
 
   for (const m of media ?? []) {
     // Claim the photo first so two calls never pay to read it twice.
     if (!force) {
-      const { data: claimed } = await db.from("job_media").update({ ai_status: "reading" }).eq("id", m.id).is("ai_status", null).select("id").maybeSingle();
+      const { data: claimed } = await db.from("job_media").update({ ai_status: "reading" }).eq("id", m.id).or("ai_status.is.null,ai_status.eq.pending").select("id").maybeSingle();
       if (!claimed) continue;
     }
     try {
