@@ -9,7 +9,7 @@ import { EquipmentArt } from "../../../lib/illustrations";
 import { label } from "../../../lib/labels";
 import {
   CatalogItem, PriceItem, QuoteAdder, QuoteDraft, QuoteOption, SystemPrice, TIER_LABEL, TIERS, Tier,
-  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, sizeMismatch, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater, waterHeaterPrice,
+  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, sizeMismatch, findProgram, rebateFor, RebateProgram, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater, waterHeaterPrice,
 } from "../../../lib/quote";
 
 const SIZES = [2, 3, 4, 5];
@@ -37,6 +37,7 @@ export default function QuoteBuilder() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [tankFor, setTankFor] = useState<number | null>(null);
+  const [programs, setPrograms] = useState<RebateProgram[]>([]);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -58,11 +59,14 @@ export default function QuoteBuilder() {
         if (!jid) throw new Error("Job not found.");
         const { data: j } = await supabase.from("jobs").select("*").eq("id", jid).maybeSingle();
         if (!j) throw new Error("Job not found, or your account doesn't have access to it.");
-        const [{ data: sp }, { data: pi }, { data: ce }] = await Promise.all([
+        const [{ data: sp }, { data: pi }, { data: ce }, { data: rp }, { data: cof }] = await Promise.all([
           supabase.from("price_book_systems").select("job_type,tier,size_tons,price,includes").eq("contractor_id", j.contractor_id),
           supabase.from("price_book_items").select("code,label,price,unit,applies_to,kind,notes").eq("contractor_id", j.contractor_id),
           supabase.from("contractor_equipment").select("tier,dealer_cost,active,image_url,equipment_catalog(*)").eq("contractor_id", j.contractor_id),
+          supabase.from("rebate_programs").select("utility,city_regex,job_type,amount,per_ton,cap,paid_to,needs_reservation").eq("contractor_id", j.contractor_id).eq("active", true),
+          supabase.from("contractors").select("bonus_label,bonus_value").eq("id", j.contractor_id).maybeSingle(),
         ]);
+        setPrograms((rp as RebateProgram[]) ?? []);
         const cat: CatalogItem[] = (ce ?? [])
           .filter((r: any) => r.active && r.equipment_catalog)
           .map((r: any) => ({ ...r.equipment_catalog, tier: r.tier, dealer_cost: r.dealer_cost, image_url: r.image_url ?? r.equipment_catalog.image_url }));
@@ -82,7 +86,8 @@ export default function QuoteBuilder() {
             rebate_label: existing.rebate_label ?? "", notes: existing.notes ?? "", crew_hours: Number(existing.crew_hours ?? 8),
           });
         } else {
-          setDraft(newDraft(j, (sp as SystemPrice[]) ?? [], (pi as PriceItem[]) ?? [], cat, sizeFromLabel(j.existing_tons) ?? guessTons(j.square_feet)));
+          setDraft(newDraft(j, (sp as SystemPrice[]) ?? [], (pi as PriceItem[]) ?? [], cat, sizeFromLabel(j.existing_tons) ?? guessTons(j.square_feet),
+            (rp as RebateProgram[]) ?? [], cof?.bonus_label ? { label: cof.bonus_label, value: Number(cof.bonus_value ?? 0) } : null));
         }
       } catch (e: any) {
         setError(e.message ?? "Couldn't load this quote.");
@@ -121,7 +126,8 @@ export default function QuoteBuilder() {
   function changeSize(size: number) {
     setDraft((d) => {
       if (!d) return d;
-      const rebate = d.rebate_label && isDucted ? Math.min(3000 * size, 10000) : d.rebate;
+      const program = job ? findProgram(programs, job) : null;
+      const rebate = d.rebate_label && program ? rebateFor(program, size) : d.rebate;
       return {
         ...d, size_tons: size, rebate,
         options: d.options.map((o) => {

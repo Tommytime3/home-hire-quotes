@@ -73,7 +73,7 @@ export type PriceItem = {
 export type SystemPrice = { job_type: string; tier: Tier; size_tons: number; price: number; includes: string | null };
 
 export type QuoteAddon = { code: string; label: string; price: number; selected: boolean };
-export type QuoteAdder = { code: string; label: string; unit: string; unit_price: number; qty: number };
+export type QuoteAdder = { code: string; label: string; unit: string; unit_price: number; qty: number; value?: number }; // value: shown crossed out for free items
 export type QuoteOption = {
   tier: Tier;
   enabled: boolean;
@@ -180,7 +180,23 @@ const DEFAULT_PITCH: Record<Tier, string> = {
 };
 
 // Build a fresh draft from the price book, the catalog, and the homeowner's answers.
-export function newDraft(job: Record<string, any>, prices: SystemPrice[], items: PriceItem[], catalog: CatalogItem[], sizeGuess: number | null): QuoteDraft {
+export type RebateProgram = { utility: string; city_regex: string; job_type: string; amount: number | null; per_ton: number | null; cap: number | null; paid_to: "contractor" | "homeowner"; needs_reservation: boolean };
+
+export function findProgram(programs: RebateProgram[] | undefined, job: Record<string, any>): RebateProgram | null {
+  return (Array.isArray(programs) ? programs : []).find((p) => p.job_type === job.job_type && new RegExp(p.city_regex, "i").test(String(job.city ?? ""))) ?? null;
+}
+
+export function rebateFor(p: RebateProgram | null, tons: number | null | undefined): number {
+  if (!p) return 0;
+  if (p.per_ton != null) {
+    const r = Number(p.per_ton) * Number(tons || 0);
+    return p.cap != null ? Math.min(r, Number(p.cap)) : r;
+  }
+  return Number(p.amount ?? 0);
+}
+
+export function newDraft(job: Record<string, any>, prices: SystemPrice[], items: PriceItem[], catalog: CatalogItem[], sizeGuess: number | null,
+  programs?: RebateProgram[], bonus?: { label: string; value: number } | null): QuoteDraft {
   const jobType: string = job.job_type;
   const size = jobType === "heat_pump_water_heater" ? 0 : sizeGuess ?? 3;
   const forJob = items.filter((i) => i.applies_to.includes(jobType));
@@ -216,11 +232,16 @@ export function newDraft(job: Record<string, any>, prices: SystemPrice[], items:
   if (job.indoor_location === "rooftop") add("crane");
 
   const permit = Number(forJob.find((i) => i.code === "permit")?.price ?? 0);
-  const svp = /santa\s*clara/i.test(String(job.city ?? ""));
-  let rebate = 0;
-  let rebate_label = "";
-  if (svp && jobType === "heat_pump_water_heater") { rebate = 5500; rebate_label = "Silicon Valley Power rebate"; }
-  if (svp && jobType === "ducted_heat_pump") { rebate = Math.min(3000 * size, 10000); rebate_label = "Silicon Valley Power rebate"; }
+  // Rebate: from the utility programs we know about for their city (same list the homeowner estimate uses)
+  const program = findProgram(programs, job);
+  const rebate = rebateFor(program, size);
+  const rebate_label = program ? `${program.utility} rebate` : "";
+
+  // Sign-up bonus they earned by talking with the rebate specialist in time: a free item, not a discount
+  if (bonus && job.bonus_earned_at) {
+    const item = bonus.label.replace(/^free\s+/i, "");
+    adders.push({ code: "bonus_free_item", label: `${item.charAt(0).toUpperCase()}${item.slice(1)} (sign-up bonus)`, unit: "flat", unit_price: 0, qty: 1, value: bonus.value });
+  }
 
   return { status: "draft", recommended: "better", size_tons: size || null, options, adders, permit, rebate, rebate_label, notes: "", crew_hours: 8 };
 }

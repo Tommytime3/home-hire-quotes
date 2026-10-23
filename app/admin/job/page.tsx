@@ -197,6 +197,11 @@ export default function JobPage() {
           {job.contact_requested_at ? ` · ${new Date(job.contact_requested_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}
         </div>
       )}
+      {job.bonus_earned_at ? (
+        <div className="bonus-badge won">🎁 Earned the sign-up bonus: free expansion tank ($500 value). It's added to their quote automatically.</div>
+      ) : job.bonus_expires_at && new Date(job.bonus_expires_at) > new Date() ? (
+        <div className="bonus-badge">🎁 Sign-up bonus open until {new Date(job.bonus_expires_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}. It's earned when they ask to talk.</div>
+      ) : null}
       {job.estimate_low != null && (
         <p className="muted small">They saw an estimate of {money(job.estimate_low)}–{money(job.estimate_high)}{Number(job.estimate_rebate) > 0 ? `, ${money(job.estimate_rebate)} rebate` : ""}.</p>
       )}

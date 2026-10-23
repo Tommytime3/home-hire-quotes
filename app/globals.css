@@ -507,3 +507,19 @@ button.block { width: 100%; }
 .label-edit .btn { justify-self: start; margin-top: 6px; }
 .est-size { margin: 6px 0 0; font-size: 14px; color: var(--ca-blue, #1d4f91); font-weight: 600; }
 .size-warn { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: #fff4e5; color: #8a4b00; font-size: 14px; font-weight: 600; border: 1px solid #f3c98b; }
+
+/* Rebates, bonus, specialist */
+.rebate-card { margin: 16px 0; padding: 16px 18px; border-radius: 16px; background: #eef6f1; border: 1px solid #cfe5d8; text-align: left; }
+.rebate-amt { margin: 6px 0 4px; font-size: 18px; }
+.rebate-extra { margin: 6px 0; font-weight: 700; color: #8a4b00; }
+.rebate-pitch { margin: 6px 0; font-size: 15px; }
+.rebate-fine { margin: 8px 0 0; font-size: 12.5px; color: #5a6862; }
+.bonus { margin: 12px 0 16px; padding: 14px 16px; border-radius: 14px; background: #fff4e5; border: 2px dashed #e8742c; text-align: left; }
+.bonus p { margin: 0; }
+.bonus .bonus-sub { margin-top: 6px; font-size: 15px; }
+.bonus .clock { font-variant-numeric: tabular-nums; color: #c4561a; }
+.bonus.won { border-style: solid; background: #eef6f1; border-color: #2f8a57; }
+.connect-h { margin: 8px 0 4px; font-size: 20px; }
+.connect-sub { margin: 0 0 12px; color: #4a5a53; font-size: 15px; }
+.bonus-badge { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: #fff4e5; border: 1px solid #f3c98b; color: #8a4b00; font-weight: 600; font-size: 14px; }
+.bonus-badge.won { background: #eef6f1; border-color: #9fd1b3; color: #1f6b41; }

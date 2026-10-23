@@ -156,8 +156,11 @@ export default function QuotePrint() {
             <ul className="ticks">
               {includeList.map((s) => <li key={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</li>)}
               <li>Haul-away &amp; recycling of old equipment <s>$500</s> <b>FREE</b></li>
-              <li>City permit and inspection ({money(q.permit)}, included in prices above)</li>
-              {adders.map((a: QuoteAdder) => <li key={a.code}>{a.label}{a.qty > 1 ? ` × ${a.qty}` : ""} ({money(adderAmount(a))}, included above)</li>)}
+              {Number(q.permit) > 0 && <li>City permit and inspection ({money(q.permit)}, included in prices above)</li>}
+              {adders.map((a: QuoteAdder) =>
+                a.unit_price === 0 && a.value
+                  ? <li key={a.code}>{a.label} <s>{money(a.value)}</s> <b>FREE</b></li>
+                  : <li key={a.code}>{a.label}{a.qty > 1 ? ` × ${a.qty}` : ""} ({money(adderAmount(a))}, included above)</li>)}
               <li>Manufacturer warranty registration, done for you</li>
               <li>{company} 2-year labor warranty</li>
             </ul>
@@ -170,7 +173,7 @@ export default function QuotePrint() {
               ))}
             </ul>
             {Number(q.rebate) > 0 && (
-              <p className="rebate-note"><b>{q.rebate_label || "Rebate"}: {money(q.rebate)}.</b> We handle the paperwork and apply it for you.</p>
+              <p className="rebate-note"><b>{q.rebate_label || "Rebate"}: {money(q.rebate)}.</b> {/silicon valley power/i.test(q.rebate_label ?? "") ? "We handle the paperwork and the utility pays us directly, so you never front it." : "We file the paperwork for you; the utility sends your rebate check."}</p>
             )}
             {q.notes && <p className="doc-note">{q.notes}</p>}
           </div>
