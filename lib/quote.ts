@@ -255,6 +255,17 @@ export function sizeFromLabel(tons: number | null | undefined): number | null {
   return sizes.find((s) => s >= t) ?? 5;
 }
 
+// Flags a label size that doesn't match the house: a ton or more apart from the square-footage
+// rule of thumb usually means the old system was undersized or the home was added onto.
+export function sizeMismatch(job: Record<string, any>): string | null {
+  const label = Number(job.existing_tons);
+  const sqft = Number(job.square_feet);
+  if (!label || !sqft || job.job_type !== "ducted_heat_pump") return null;
+  const guess = guessTons(sqft);
+  if (!guess || Math.abs(guess - label) < 1) return null;
+  return `Label says ${label} ton, but ${sqft.toLocaleString()} sq ft usually needs about ${guess} ton. Check before quoting.`;
+}
+
 // Rough size guess from square footage, using 500-600 sq ft per ton (Comfort Air rule of thumb).
 export function guessTons(sqft: number | null | undefined): number | null {
   if (!sqft) return null;

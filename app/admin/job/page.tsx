@@ -5,7 +5,7 @@ import { supabase } from "../../../lib/supabase";
 import { label, STEP_LABELS, ZONE_LABELS, CONTACT_LABELS } from "../../../lib/labels";
 import { Login, useSession } from "../../../lib/auth";
 import { AdminShell } from "../../../lib/AdminShell";
-import { money } from "../../../lib/quote";
+import { money, sizeMismatch } from "../../../lib/quote";
 
 type Job = Record<string, any>;
 type Media = { id: string; step: string; kind: "photo" | "video"; storage_path: string; url?: string };
@@ -92,6 +92,7 @@ function LabelCard({ job, onChange }: { job: Job; onChange: (patch: Partial<Job>
         <button className="btn ghost" disabled={busy} onClick={reread}>{busy ? "Reading…" : "Read label again"}</button>
       </div>
       {read ? <p>{read}{job.existing_tons ? ` · ${job.existing_tons} ton` : ""}</p> : <p className="muted">Not read yet.</p>}
+      {sizeMismatch(job) && <p className="size-warn">⚠ {sizeMismatch(job)}</p>}
       {job.plate_source && <p className="muted small">{job.plate_source === "ai" ? "Read automatically. Double-check it against the photo." : "Entered by you."}</p>}
       {isWh && (
         <div className="label-edit">

@@ -506,3 +506,4 @@ button.block { width: 100%; }
 .label-edit { display: grid; grid-template-columns: 1fr; gap: 6px; max-width: 360px; margin-top: 8px; }
 .label-edit .btn { justify-self: start; margin-top: 6px; }
 .est-size { margin: 6px 0 0; font-size: 14px; color: var(--ca-blue, #1d4f91); font-weight: 600; }
+.size-warn { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: #fff4e5; color: #8a4b00; font-size: 14px; font-weight: 600; border: 1px solid #f3c98b; }

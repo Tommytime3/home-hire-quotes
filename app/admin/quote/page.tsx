@@ -9,7 +9,7 @@ import { EquipmentArt } from "../../../lib/illustrations";
 import { label } from "../../../lib/labels";
 import {
   CatalogItem, PriceItem, QuoteAdder, QuoteDraft, QuoteOption, SystemPrice, TIER_LABEL, TIERS, Tier,
-  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater,
+  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, sizeMismatch, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater,
 } from "../../../lib/quote";
 
 const SIZES = [2, 3, 4, 5];
@@ -207,6 +207,7 @@ export default function QuoteBuilder() {
                 : "Label not read yet: check the old unit's label in the photos. "}
               {tonsGuess ? `${job.square_feet.toLocaleString()} sq ft ≈ ${tonsGuess} ton by your rule of thumb.` : ""}
             </p>
+            {sizeMismatch(job) && <p className="size-warn">⚠ {sizeMismatch(job)}</p>}
           </div>
           <div className="seg">
             {SIZES.map((s) => (
