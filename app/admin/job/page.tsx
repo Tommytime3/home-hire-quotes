@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { label, STEP_LABELS, ZONE_LABELS } from "../../../lib/labels";
 import { Login, useSession } from "../../../lib/auth";
+import { AdminShell } from "../../../lib/AdminShell";
+import { money } from "../../../lib/quote";
 
 type Job = Record<string, any>;
 type Media = { id: string; step: string; kind: "photo" | "video"; storage_path: string; url?: string };
@@ -47,6 +49,7 @@ export default function JobPage() {
   const [job, setJob] = useState<Job | null | undefined>(undefined);
   const [media, setMedia] = useState<Media[]>([]);
   const [saving, setSaving] = useState(false);
+  const [quotes, setQuotes] = useState<any[]>([]);
 
   useEffect(() => setId(new URLSearchParams(window.location.search).get("id")), []);
 
@@ -65,6 +68,8 @@ export default function JobPage() {
         list.forEach((m) => (m.url = byPath.get(m.storage_path) ?? undefined));
       }
       setMedia(list);
+      const { data: qs } = await supabase.from("quotes").select("id,status,options,updated_at").eq("job_id", id).order("updated_at", { ascending: false });
+      setQuotes(qs ?? []);
     })();
   }, [session, id]);
 
@@ -76,10 +81,10 @@ export default function JobPage() {
     setSaving(false);
   }
 
-  if (session === undefined) return <main className="wrap"><p className="lead">Loading…</p></main>;
+  if (session === undefined) return <AdminShell><p className="lead">Loading…</p></AdminShell>;
   if (!session) return <Login />;
-  if (job === undefined) return <main className="wrap"><p className="lead">Loading job…</p></main>;
-  if (job === null) return <main className="wrap"><p className="lead">Job not found, or your account doesn't have access to it.</p><a href="/admin">Back to jobs</a></main>;
+  if (job === undefined) return <AdminShell><p className="lead">Loading job…</p></AdminShell>;
+  if (job === null) return <AdminShell back={{ href: "/admin", label: "All jobs" }}><p className="lead">Job not found, or your account doesn't have access to it.</p></AdminShell>;
 
   const name = [job.first_name, job.last_name].filter(Boolean).join(" ") || "Homeowner";
   const first = job.first_name || "there";
@@ -98,8 +103,7 @@ export default function JobPage() {
   ];
 
   return (
-    <main className="wrap admin">
-      <a className="back" href="/admin">← All jobs</a>
+    <AdminShell back={{ href: "/admin", label: "All jobs" }}>
       <div className="admin-head">
         <div>
           <h1>{name}</h1>
@@ -107,6 +111,23 @@ export default function JobPage() {
         </div>
         <span className={`pill ${job.status}`}>{label("status", job.status)}</span>
       </div>
+
+      <section className="card quote-card">
+        <div className="quote-card-head">
+          <h2>Quote</h2>
+          <a className="btn" href={quotes.length ? `/admin/quote?id=${quotes[0].id}` : `/admin/quote?job=${job.id}`}>
+            {quotes.length ? "Edit quote" : "Build quote"}
+          </a>
+        </div>
+        {quotes.length === 0 && <p>No quote yet. Build Good / Better / Best from your price book.</p>}
+        {quotes.map((qt) => (
+          <a key={qt.id} className="quote-row" href={`/admin/quote/print?id=${qt.id}`}>
+            <span>{qt.status === "sent" ? "Sent" : "Draft"} · {new Date(qt.updated_at).toLocaleDateString()}</span>
+            <span className="muted">{(qt.options ?? []).filter((o: any) => o.enabled).map((o: any) => money(o.base_price)).join(" / ")}</span>
+            <span className="link-txt">View PDF →</span>
+          </a>
+        ))}
+      </section>
 
       <div className="actions">
         <a className="act" href={`tel:${phoneDigits}`}>Call</a>
@@ -184,6 +205,6 @@ export default function JobPage() {
           ))}
         </div>
       </section>
-    </main>
+    </AdminShell>
   );
 }

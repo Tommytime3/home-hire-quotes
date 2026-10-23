@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { label } from "../../lib/labels";
 import { Login, useSession } from "../../lib/auth";
+import { AdminShell } from "../../lib/AdminShell";
 
 type JobRow = {
   id: string;
@@ -42,20 +43,27 @@ export default function AdminHome() {
       .then(({ data }) => setJobs((data as JobRow[]) ?? []));
   }, [session]);
 
-  if (session === undefined) return <main className="wrap"><p className="lead">Loading…</p></main>;
+  if (session === undefined) return <AdminShell><p className="lead">Loading…</p></AdminShell>;
   if (!session) return <Login />;
 
   const list = (jobs ?? []).filter((j) => showDrafts || j.status !== "capturing");
 
   return (
-    <main className="wrap admin">
+    <AdminShell>
       <div className="admin-head">
         <div>
-          <p className="brand">Home Hire</p>
+          <p className="eyebrow">Dashboard</p>
           <h1>Quote requests</h1>
         </div>
-        <button className="link" onClick={() => supabase.auth.signOut()}>Log out</button>
       </div>
+      {jobs && (
+        <div className="stats">
+          <div><strong>{jobs.filter((j) => j.status === "submitted").length}</strong><span>New</span></div>
+          <div><strong>{jobs.filter((j) => j.status === "in_review").length}</strong><span>In review</span></div>
+          <div><strong>{jobs.filter((j) => j.status === "quoted").length}</strong><span>Quoted</span></div>
+          <div><strong>{jobs.filter((j) => j.status === "signed").length}</strong><span>Signed</span></div>
+        </div>
+      )}
 
       {jobs === null && <p className="lead">Loading jobs…</p>}
       {jobs !== null && jobs.length === 0 && (
@@ -80,6 +88,6 @@ export default function AdminHome() {
           {showDrafts ? "Hide" : "Show"} unfinished requests ({jobs.filter((j) => j.status === "capturing").length})
         </button>
       )}
-    </main>
+    </AdminShell>
   );
 }
