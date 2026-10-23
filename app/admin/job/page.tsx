@@ -80,7 +80,8 @@ function LabelCard({ job, onChange }: { job: Job; onChange: (patch: Partial<Job>
       setFuel(fresh.existing_fuel ?? "");
       setTons(fresh.existing_tons ? String(fresh.existing_tons) : "");
     }
-    setMsg(data?.label?.is_label ? `Read it (${data.label.confidence} confidence)${data.label.note ? `: ${data.label.note}` : ""}` : "Couldn't find a readable label in the photo.");
+    if (!data?.read) return setMsg("The reader hit an error on this photo. Try again in a minute, or type the size in.");
+    setMsg(data?.label?.is_label ? `Read it (${data.label.confidence} confidence)${data.label.note ? `: ${data.label.note}` : ""}` : "Couldn't find a readable label in the photo. Ask the homeowner for a closer, sharper photo.");
   }
 
   const read = [job.existing_brand, job.existing_model && `model ${job.existing_model}`, job.existing_serial && `serial ${job.existing_serial}`, job.existing_year && `made ${job.existing_year}`].filter(Boolean).join(" · ");

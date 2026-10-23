@@ -54,22 +54,28 @@ async function readOne(apiKey: string, bytes: Uint8Array, mediaType: string) {
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 600,
+      max_tokens: 1500,
       tools: [TOOL],
-      tool_choice: { type: "tool", name: "save_label" },
+      tool_choice: { type: "auto" }, // forcing a specific tool isn't supported on every model
       messages: [{
         role: "user",
         content: [
           { type: "image", source: { type: "base64", media_type: mediaType, data: b64(bytes) } },
-          { type: "text", text: "This is a homeowner's photo of the label on their HVAC equipment or water heater. Read it exactly. Only report what is printed or clearly decodable; never guess." },
+          { type: "text", text: "This is a homeowner's photo of the label on their HVAC equipment or water heater. Read it exactly. Only report what is printed or clearly decodable; never guess. Always answer by calling the save_label tool, even if the label is unreadable (then set is_label to false)." },
         ],
       }],
     }),
   });
   if (!res.ok) { const t = await res.text(); console.log("read-data-plate: vision error", res.status, t.slice(0, 300)); throw new Error(`vision ${res.status}`); }
   const out = await res.json();
-  const use = out.content?.find((c: any) => c.type === "tool_use");
-  return use?.input ?? null;
+  const use = out.content?.find((c: any) => c.type === "tool_use" && c.name === "save_label");
+  if (use?.input) return use.input;
+  // Fallback: the model answered in text. Pull out a JSON object if there is one.
+  const text = (out.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch { /* not JSON */ } }
+  console.log("read-data-plate: no structured answer", text.slice(0, 300));
+  return null;
 }
 
 const MEDIA_TYPES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
