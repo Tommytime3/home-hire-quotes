@@ -12,7 +12,7 @@ export function defaultBullets(items: CatalogItem[], jobType: string): string[] 
     if (wh?.gallons) w.push(`${wh.gallons}-gallon tank`);
     w.push("Up to 4x more efficient than a gas tank");
     if (wh?.brand === "Navien") w.push("Premium Navien build with smart Wi-Fi controls");
-    if (wh?.brand === "Bradford White") w.push("Bradford White: sold only through licensed pros");
+    if (wh?.brand === "Bradford White") w.push("Built in America by Bradford White");
     if (wh?.brand === "Rheem") w.push("10-year tank and parts warranty");
     w.push("Qualifies for utility rebates");
     return w.slice(0, 4);
