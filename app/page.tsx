@@ -117,7 +117,13 @@ const STEPS: Step[] = [
     captures: [
       { step: "water_heater", title: "Film the water heater and the space around it", hint: "Show the floor, ceiling, and the pipes on top.", kind: "video", required: true },
       { step: "indoor_data_plate", title: "Photo of the tank's label", hint: "The sticker with the model number and size in gallons.", kind: "photo", required: true },
+      { step: "door_width_measurement", title: "Photo of the door opening with a tape measure", hint: "Open the door all the way and stretch the tape across the narrowest part of the opening, inside the frame. Make sure we can read the number.", kind: "photo", required: true },
     ],
+    fields: [
+      { key: "door_width_in", label: "Door opening width (inches)", type: "number", required: true },
+      { key: "door_height_in", label: "Door opening height (inches, if you can)", type: "number" },
+    ],
+    tip: "The new water heater has to fit through this door, so the width matters. Measure the opening, not the door itself.",
   },
   {
     id: "panel",
@@ -403,7 +409,7 @@ export default function CapturePage() {
                 <input
                   id={f.key}
                   type={f.type}
-                  inputMode={f.type === "number" ? "numeric" : f.type === "tel" ? "tel" : undefined}
+                  inputMode={f.type === "number" ? "decimal" : f.type === "tel" ? "tel" : undefined}
                   autoComplete={AUTOCOMPLETE[f.key]}
                   value={answers[f.key] ?? ""}
                   onChange={(e) => set(f.key, e.target.value)}

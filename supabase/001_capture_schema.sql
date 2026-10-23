@@ -165,3 +165,7 @@ create policy "staff view own job media files" on storage.objects
 
 -- Contractor #1
 insert into public.contractors (name, home_zip) values ('Comfort Air Heating & Air Conditioning', '95112');
+
+-- Added later (applied as migrations): panel video step, door opening measurements.
+-- alter table public.jobs add column door_width_in numeric, add column door_height_in numeric;
+-- job_media.step also allows 'panel_video' and 'door_width_measurement'.
