@@ -195,7 +195,7 @@ export default function CapturePage() {
     [jobType]
   );
   const step = steps[index];
-  const isLast = index === steps.length - 1;
+  const isLast = !!jobType && index === steps.length - 1;
 
   function set(key: string, value: string) {
     setAnswers((a) => ({ ...a, [key]: value }));
