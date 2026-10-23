@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { useContractor } from "./contractor";
+import { isAvailable, setContractorCache, useContractor, Contractor } from "./contractor";
 
 const TABS = [
   { href: "/admin", label: "Jobs", match: ["/admin", "/admin/job", "/admin/quote"] },
@@ -25,6 +25,17 @@ export function BrandMark({ size = 30 }: { size?: number }) {
 export function AdminShell({ children, back }: { children: React.ReactNode; back?: { href: string; label: string } }) {
   const co = useContractor();
   const [path, setPath] = useState("");
+  const [avail, setAvail] = useState(false);
+  useEffect(() => setAvail(isAvailable(co)), [co]);
+
+  async function toggleAvail() {
+    if (!co) return;
+    const on = !avail;
+    setAvail(on);
+    const until = on ? new Date(Date.now() + 3 * 3600 * 1000).toISOString() : null;
+    const { data } = await supabase.from("contractors").update({ available_now: on, available_until: until }).eq("id", co.id).select("*").single();
+    if (data) setContractorCache(data as Contractor);
+  }
   useEffect(() => setPath(window.location.pathname.replace(/\/$/, "") || "/admin"), []);
   const active = TABS.find((t) => t.match.includes(path))?.href;
   const name = co?.display_name || "Comfort Air";
@@ -46,9 +57,22 @@ export function AdminShell({ children, back }: { children: React.ReactNode; back
               </>
             )}
           </a>
-          <button className="ca-logout" onClick={() => supabase.auth.signOut().then(() => (window.location.href = "/admin"))}>
-            Log out
-          </button>
+          <div className="ca-bar-right">
+            {co && (
+              <button
+                className={`avail ${avail ? "on" : ""}`}
+                onClick={toggleAvail}
+                aria-pressed={avail}
+                title={avail ? "Homeowners see 'Video chat now' for the next 3 hours" : "Turn on to offer live video chat"}
+              >
+                <span className="knob" aria-hidden="true" />
+                {avail ? "Available" : "Away"}
+              </button>
+            )}
+            <button className="ca-logout" onClick={() => supabase.auth.signOut().then(() => (window.location.href = "/admin"))}>
+              Log out
+            </button>
+          </div>
         </div>
         <nav className="ca-tabs" aria-label="Sections">
           {TABS.map((t) => (

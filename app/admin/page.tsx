@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { label } from "../../lib/labels";
+import { label, CONTACT_LABELS } from "../../lib/labels";
 import { Login, useSession } from "../../lib/auth";
 import { AdminShell } from "../../lib/AdminShell";
 
@@ -16,6 +16,9 @@ type JobRow = {
   phone: string | null;
   submitted_at: string | null;
   created_at: string;
+  contact_request: string | null;
+  contact_pref: string | null;
+  contact_requested_at: string | null;
 };
 
 function ago(iso: string | null) {
@@ -33,20 +36,27 @@ export default function AdminHome() {
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [showDrafts, setShowDrafts] = useState(false);
 
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   useEffect(() => {
     if (!session) return;
     supabase
       .from("jobs")
-      .select("id,status,job_type,first_name,last_name,city,phone,submitted_at,created_at")
+      .select("id,status,job_type,first_name,last_name,city,phone,submitted_at,created_at,contact_request,contact_pref,contact_requested_at")
       .order("created_at", { ascending: false })
       .limit(200)
       .then(({ data }) => setJobs((data as JobRow[]) ?? []));
-  }, [session]);
+  }, [session, tick]);
 
   if (session === undefined) return <AdminShell><p className="lead">Loading…</p></AdminShell>;
   if (!session) return <Login />;
 
-  const list = (jobs ?? []).filter((j) => showDrafts || j.status !== "capturing");
+  // Someone who has entered a name and number is a real lead even before they finish.
+  const list = (jobs ?? []).filter((j) => showDrafts || j.status !== "capturing" || (j.first_name && j.phone));
 
   return (
     <AdminShell>
@@ -75,9 +85,10 @@ export default function AdminHome() {
           <div>
             <h2>{[j.first_name, j.last_name].filter(Boolean).join(" ") || "No name yet"}</h2>
             <p>{label("job_type", j.job_type)} · {j.city || "No city"}</p>
+            {j.contact_request && <span className="ask">● {CONTACT_LABELS[j.contact_request]}{j.contact_pref ? `: ${j.contact_pref}` : ""}</span>}
           </div>
           <div className="job-meta">
-            <span className={`pill ${j.status}`}>{label("status", j.status)}</span>
+            <span className={`pill ${j.status === "capturing" ? "started" : j.status}`}>{label("status", j.status)}</span>
             <span className="when">{ago(j.submitted_at ?? j.created_at)}</span>
           </div>
         </a>
@@ -85,7 +96,7 @@ export default function AdminHome() {
 
       {jobs && jobs.some((j) => j.status === "capturing") && (
         <button className="link" onClick={() => setShowDrafts((v) => !v)}>
-          {showDrafts ? "Hide" : "Show"} unfinished requests ({jobs.filter((j) => j.status === "capturing").length})
+          {showDrafts ? "Hide" : "Show"} anonymous unfinished requests ({jobs.filter((j) => j.status === "capturing").length})
         </button>
       )}
     </AdminShell>

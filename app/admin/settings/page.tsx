@@ -7,7 +7,7 @@ import { AdminShell } from "../../../lib/AdminShell";
 import { Contractor, monthlyPayment, setContractorCache, useContractor } from "../../../lib/contractor";
 import { money } from "../../../lib/quote";
 
-type Form = Pick<Contractor, "display_name" | "license_number" | "phone" | "website" | "alert_email" | "finance_lender" | "finance_apr" | "finance_months" | "logo_url">;
+type Form = Pick<Contractor, "display_name" | "license_number" | "phone" | "website" | "alert_email" | "finance_lender" | "finance_apr" | "finance_months" | "logo_url" | "meet_link">;
 
 export default function SettingsPage() {
   const session = useSession();
@@ -19,7 +19,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (co) setF({
       display_name: co.display_name, license_number: co.license_number, phone: co.phone, website: co.website,
-      alert_email: co.alert_email, finance_lender: co.finance_lender, finance_apr: co.finance_apr, finance_months: co.finance_months, logo_url: co.logo_url,
+      alert_email: co.alert_email, finance_lender: co.finance_lender, finance_apr: co.finance_apr, finance_months: co.finance_months, logo_url: co.logo_url, meet_link: co.meet_link,
     });
   }, [co]);
 
@@ -99,6 +99,37 @@ export default function SettingsPage() {
           <label className="lbl">Number of months</label>
           <input type="number" inputMode="numeric" value={f.finance_months ?? ""} onChange={(e) => set("finance_months", e.target.value === "" ? null : Number(e.target.value))} />
           {sample && <p className="tip">Example: a $12,000 job comes to about <b>{money(sample)}/mo</b>.</p>}
+        </div>
+      </section>
+
+      <section className="panel grid2">
+        <div>
+          <h2>Live video chat</h2>
+          <p className="muted small">When you flip <b>Available</b> on (top right), homeowners who finish see a "Video chat now" button that opens this link.</p>
+          <label className="lbl">Google Meet link</label>
+          <input type="text" value={f.meet_link ?? ""} onChange={(e) => set("meet_link", e.target.value.trim())} placeholder="https://meet.google.com/abc-defg-hij" />
+          <p className="muted small">Get one at meet.google.com → New meeting → Create a meeting for later. Use the same link every time.</p>
+        </div>
+        <div>
+          <h2>Phone alerts</h2>
+          <p className="muted small">Instant alerts when someone starts a quote, finishes, or asks to talk.</p>
+          <ol className="steps-small">
+            <li>Install the free <b>ntfy</b> app (App Store or Google Play).</li>
+            <li>Tap <b>+</b> and subscribe to this channel name:</li>
+          </ol>
+          <code className="topic">{co.ntfy_topic}</code>
+          <p className="muted small">Keep this name private: anyone with it could read your alerts.</p>
+          <button
+            className="btn ghost"
+            onClick={async () => {
+              await fetch(`https://ntfy.sh/${co.ntfy_topic}`, { method: "POST", headers: { Title: "Home Hire test alert" }, body: "Alerts are working. You'll get these when homeowners start, finish, or ask to talk." })
+                .then(() => setMsg("Test alert sent"))
+                .catch(() => setMsg("Couldn't send the test alert"));
+              setTimeout(() => setMsg(null), 2000);
+            }}
+          >
+            Send a test alert
+          </button>
         </div>
       </section>
 

@@ -39,9 +39,16 @@ export const LABELS: Record<string, Record<string, string>> = {
   },
   airflow_config: { upflow: "Upflow", downflow: "Downflow", horizontal: "Horizontal", unsure: "Not sure" },
   status: {
-    capturing: "Still filling out", submitted: "New", in_review: "In review",
+    capturing: "Filling out now", submitted: "New", in_review: "In review",
     quoted: "Quoted", signed: "Signed", declined: "Declined",
   },
+};
+
+export const CONTACT_LABELS: Record<string, string> = {
+  video: "Wants a video call now",
+  call: "Tapped Call now",
+  later: "Wants a call back",
+  text: "Wants quote by text",
 };
 
 export const ZONE_LABELS: Record<string, string> = {

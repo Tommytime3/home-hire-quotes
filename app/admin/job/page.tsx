@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
-import { label, STEP_LABELS, ZONE_LABELS } from "../../../lib/labels";
+import { label, STEP_LABELS, ZONE_LABELS, CONTACT_LABELS } from "../../../lib/labels";
 import { Login, useSession } from "../../../lib/auth";
 import { AdminShell } from "../../../lib/AdminShell";
 import { money } from "../../../lib/quote";
@@ -111,6 +111,16 @@ export default function JobPage() {
         </div>
         <span className={`pill ${job.status}`}>{label("status", job.status)}</span>
       </div>
+
+      {job.contact_request && (
+        <div className="contact-alert">
+          ● {CONTACT_LABELS[job.contact_request]}{job.contact_pref ? `: ${job.contact_pref}` : ""}
+          {job.contact_requested_at ? ` · ${new Date(job.contact_requested_at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}
+        </div>
+      )}
+      {job.estimate_low != null && (
+        <p className="muted small">They saw an estimate of {money(job.estimate_low)}–{money(job.estimate_high)}{Number(job.estimate_rebate) > 0 ? `, ${money(job.estimate_rebate)} rebate` : ""}.</p>
+      )}
 
       <section className="card quote-card">
         <div className="quote-card-head">

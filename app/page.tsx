@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase, DEFAULT_CONTRACTOR_ID } from "../lib/supabase";
+import { Finish } from "../lib/Finish";
 
 type JobType = "ducted_heat_pump" | "ductless" | "heat_pump_water_heater";
 type Answers = Record<string, string>;
@@ -404,6 +405,7 @@ export default function CapturePage() {
     const id = await ensureJob();
     const { error } = await supabase.rpc("update_job_answers", { p_job_id: id, p_answers: answers, p_submit: submit });
     if (error) throw error;
+    return id;
   }
 
   function patchUpload(id: string, patch: Partial<Upload>) {
@@ -454,13 +456,16 @@ export default function CapturePage() {
     setError(null);
     setBusy("next");
     try {
-      await saveAnswers(isLast);
+      const id = await saveAnswers(isLast);
       if (isLast) {
         setSubmitted(true);
-        // Alert the contractor. Fire and forget: the homeowner shouldn't wait on email.
-        if (jobId) supabase.functions.invoke("notify-new-job", { body: { job_id: jobId } }).catch(() => {});
-      }
-      else {
+        // Alert the contractor. Fire and forget: the homeowner shouldn't wait on it.
+        supabase.functions.invoke("notify-new-job", { body: { job_id: id, event: "submitted" } }).catch(() => {});
+      } else {
+        if (step.id === "contact") {
+          // They've given us a name and number: tell the contractor someone is filling out a quote.
+          supabase.functions.invoke("notify-new-job", { body: { job_id: id, event: "started" } }).catch(() => {});
+        }
         setIndex((i) => i + 1);
         window.scrollTo(0, 0);
       }
@@ -471,16 +476,8 @@ export default function CapturePage() {
     }
   }
 
-  if (submitted) {
-    return (
-      <main className="wrap done">
-        <div className="done-badge" aria-hidden="true">✓</div>
-        <h1>You're all set, {answers.first_name}.</h1>
-        <p className="lead">
-          We're reviewing your photos and videos now. You'll get your quote by text and email, usually the same day.
-        </p>
-      </main>
-    );
+  if (submitted && jobId) {
+    return <Finish jobId={jobId} firstName={answers.first_name} city={answers.city} />;
   }
 
   const total = jobType ? steps.length : null;

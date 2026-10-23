@@ -18,7 +18,15 @@ export type Contractor = {
   finance_months: number | null;
   home_zip: string | null;
   alert_email: string | null;
+  meet_link: string | null;
+  ntfy_topic: string | null;
+  available_now: boolean;
+  available_until: string | null;
 };
+
+export function isAvailable(c: Contractor | null): boolean {
+  return !!c?.available_now && (!c.available_until || new Date(c.available_until) > new Date());
+}
 
 // The company the logged-in staff member works for. Cached for the session.
 let cached: Contractor | null = null;
