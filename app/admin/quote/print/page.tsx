@@ -8,6 +8,21 @@ import { monthlyPayment } from "../../../../lib/contractor";
 import { EquipmentArt } from "../../../../lib/illustrations";
 import { QuoteAdder, QuoteOption, TIER_LABEL, adderAmount, money, optionTotals } from "../../../../lib/quote";
 
+// Small line icons for the quote (inline so they print sharp)
+const svg = (d: React.ReactNode) => () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
+);
+const Ico = {
+  check: svg(<path d="M5 12.5l4.2 4.2L19 7" />),
+  lock: svg(<><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></>),
+  home: svg(<><path d="M4 11l8-6 8 6" /><path d="M6 10v9h12v-9" /></>),
+  gift: svg(<><rect x="4" y="9" width="16" height="11" rx="1.5" /><path d="M12 9v11M4 13h16M12 9c-2-4-6-3-5 0M12 9c2-4 6-3 5 0" /></>),
+  camera: svg(<><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="12" cy="13.5" r="3.5" /><path d="M8 7l1.5-2.5h5L16 7" /></>),
+  doc: svg(<><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M10 12h5M10 16h5" /></>),
+  bolt: svg(<path d="M13 3L5 13h6l-1 8 8-10h-6z" />),
+  shield: svg(<><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M8.5 12l2.5 2.5L16 9.5" /></>),
+};
+
 export default function QuotePrint() {
   const session = useSession();
   const [q, setQ] = useState<any>(null);
@@ -50,6 +65,9 @@ export default function QuotePrint() {
   const includeList = includes.split(",").map((s) => s.trim()).filter((s) => s && !/haul-?away/i.test(s));
   const financeReady = co.finance_apr != null && !!co.finance_months;
   const company = co.display_name || "Comfort Air";
+  const specialist = co.specialist_name || "us";
+  const fmtShort = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const projectName = job.job_type === "heat_pump_water_heater" ? "Heat pump water heater" : `${q.size_tons ? `${q.size_tons}-ton ` : ""}heat pump system`;
   const mailBody = encodeURIComponent(
     `Hi ${job.first_name ?? ""},\n\nAttached is your ${company} quote with options to choose from. ` +
     `Reply here or call me with any questions, and I'm happy to walk you through it.\n\nThis quote is good through ${fmt(validUntil)}.\n\nTommy\n${co.name}`
@@ -73,130 +91,160 @@ export default function QuotePrint() {
         <p className="muted small">In the print window choose "Save as PDF," then attach it to your email.</p>
       </div>
 
-      <article className="doc">
-        <header className="doc-head">
-          <div className="doc-brand">
-            {co.logo_url ? (
-              <img src={co.logo_url} alt={company} className="doc-logo" />
-            ) : (
-              <>
-                <span className="doc-mark"><BrandMark size={44} /></span>
-                <div><strong>{company}</strong><span>Heating &amp; Air Conditioning</span></div>
-              </>
-            )}
+      <article className="qd">
+        {/* Hero */}
+        <header className="qd-hero">
+          <div className="qd-hero-top">
+            <div className="qd-logo">
+              {co.logo_url ? <img src={co.logo_url} alt={company} /> : <span className="qd-logo-txt"><BrandMark size={34} /> {company}</span>}
+            </div>
+            <div className="qd-meta">
+              <span>Quote #{quoteNo}</span>
+              <span>{fmt(created)}</span>
+            </div>
           </div>
-          <div className="doc-meta">
-            <h1>Your comfort options</h1>
-            <p>Quote #{quoteNo} · {fmt(created)}</p>
-            <p>Valid through {fmt(validUntil)}</p>
+          <p className="qd-hi">Hi {job.first_name || "there"},</p>
+          <h1 className="qd-title">Here's your {projectName.toLowerCase()} quote.</h1>
+          <p className="qd-sub">Priced from your photos, with no sales visit and no pressure. Pick the option that fits you.</p>
+          <div className="qd-chips">
+            <span className="qd-chip"><Ico.lock /> Price locked until {fmtShort(validUntil)}</span>
+            <span className="qd-chip"><Ico.home /> {[job.street, job.city].filter(Boolean).join(", ") || "Your home"}</span>
+            {Number(q.rebate) > 0 && <span className="qd-chip gold"><Ico.gift /> {money(q.rebate)} rebate applied</span>}
           </div>
         </header>
 
-        <section className="doc-for">
-          <div>
-            <span className="cap">Prepared for</span>
-            <strong>{name}</strong>
-            <span>{[job.street, job.city, job.zip].filter(Boolean).join(", ")}</span>
-            <span>{[job.phone, job.email].filter(Boolean).join(" · ")}</span>
-          </div>
-          <div>
-            <span className="cap">Project</span>
-            <strong>
-              {job.job_type === "heat_pump_water_heater" ? "Heat pump water heater replacement" : `${q.size_tons ? `${q.size_tons}-ton ` : ""}heat pump system replacement`}
-            </strong>
-            <span>Price is locked for this scope. Any change needs your written approval.</span>
-          </div>
+        {/* The promise */}
+        <section className="qd-promise">
+          {[
+            [Ico.camera, "Priced from your photos", "No tape-measure sales visit"],
+            [Ico.lock, "Locked in writing", "No surprise add-ons later"],
+            [Ico.doc, "Permit & rebate handled", "We file all the paperwork"],
+            [Ico.bolt, "Installed in days", "Most jobs done in one day"],
+          ].map(([I, t, d]: any) => (
+            <div key={t} className="qd-p"><span className="qd-p-ico"><I /></span><b>{t}</b><small>{d}</small></div>
+          ))}
         </section>
 
-        <section className={`cards n${options.length}`}>
+        {/* Options */}
+        <h2 className="qd-h2">Your options</h2>
+        <section className={`qd-cards n${options.length}`}>
           {options.map((o) => {
             const t = optionTotals(o, q);
             const mo = financeReady ? monthlyPayment(t.afterRebate, co.finance_apr, co.finance_months) : null;
             const bullets = (o.bullets ?? []).map((b) => b.trim()).filter(Boolean);
+            const rec = q.recommended === o.tier;
             return (
-              <div key={o.tier} className={`card-opt est-${o.tier}`}>
-                <div className="est-band"><span>{TIER_LABEL[o.tier]}</span></div>
-                <div className="est-photo">
-                  {o.image_url ? <img src={o.image_url} alt={o.title} /> : <EquipmentArt kind={o.image_kind ?? "heat_pump_outdoor"} />}
+              <div key={o.tier} className={`qd-card t-${o.tier} ${rec ? "qd-rec" : ""}`}>
+                {rec && <span className="qd-ribbon">★ Our pick</span>}
+                <div className="qd-card-head">
+                  <span className="qd-tier">{TIER_LABEL[o.tier]}</span>
+                  <h3>{o.title}</h3>
                 </div>
-                <h2>{o.title}</h2>
-                <span className={`rec-badge ${q.recommended === o.tier ? "" : "hide"}`}>Recommended</span>
-                <div className="est-price">
-                  <div>
-                    <span className="cap-sm">Total price</span>
-                    <strong>{money(t.afterRebate)}</strong>
+                <div className="qd-card-body">
+                  <div className="qd-photo">
+                    {o.image_url ? <img src={o.image_url} alt={o.title} /> : <EquipmentArt kind={o.image_kind ?? "heat_pump_outdoor"} />}
                   </div>
-                  {mo && (
-                    <div>
-                      <span className="cap-sm accent">Or as low as</span>
-                      <strong className="accent">{money(mo)}<small>/mo</small></strong>
-                    </div>
-                  )}
+                  <div className="qd-price">
+                    <span className="qd-cap">Your price</span>
+                    <strong>{money(t.afterRebate)}</strong>
+                    {Number(q.rebate) > 0 && <span className="qd-was">{money(t.beforeRebate)} − {money(q.rebate)} rebate</span>}
+                    {mo && <span className="qd-mo">or {money(mo)}/mo</span>}
+                  </div>
+                  <ul className="qd-bul">
+                    {bullets.map((b) => <li key={b}><Ico.check />{b}</li>)}
+                    {o.addons.filter((a) => a.selected).map((a) => <li key={a.code}><Ico.check />{a.label} included</li>)}
+                  </ul>
+                  <p className="qd-equip">{o.equipment_text}</p>
                 </div>
-                {Number(q.rebate) > 0 && <p className="card-rebate">{money(t.beforeRebate)} minus {money(q.rebate)} {q.rebate_label || "rebate"}</p>}
-                <ul className="card-bullets">
-                  {bullets.map((b) => <li key={b}>{b}</li>)}
-                  {o.addons.filter((a) => a.selected).map((a) => <li key={a.code}>{a.label} included</li>)}
-                </ul>
-                <p className="card-equip">{o.equipment_text}</p>
               </div>
             );
           })}
         </section>
         {financeReady && (
-          <p className="fine center">
+          <p className="qd-fine center">
             Monthly payments are estimates based on {co.finance_months} monthly payments at {co.finance_apr}% APR
             {co.finance_lender ? ` through ${co.finance_lender}` : ""}, after any rebate shown. Subject to credit approval; your rate and terms may differ.
           </p>
         )}
 
-        <section className="doc-cols">
-          <div>
-            <h3>Included with every option</h3>
-            <ul className="ticks">
-              {includeList.map((s) => <li key={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</li>)}
-              <li>Haul-away &amp; recycling of old equipment <s>$500</s> <b>FREE</b></li>
-              {Number(q.permit) > 0 && <li>City permit and inspection ({money(q.permit)}, included in prices above)</li>}
+        {/* Included + add-ons */}
+        <section className="qd-two">
+          <div className="qd-box">
+            <h2 className="qd-h3">Included with every option</h2>
+            <ul className="qd-inc">
+              {includeList.map((s) => <li key={s}><Ico.check />{s.charAt(0).toUpperCase() + s.slice(1)}</li>)}
+              <li><Ico.check /><span>Haul-away &amp; recycling of old equipment <s>$500</s> <b className="free">FREE</b></span></li>
+              {Number(q.permit) > 0 && <li><Ico.check />City permit and inspection ({money(q.permit)}, in your price)</li>}
               {adders.map((a: QuoteAdder) =>
                 a.unit_price === 0 && a.value
-                  ? <li key={a.code}>{a.label} <s>{money(a.value)}</s> <b>FREE</b></li>
-                  : <li key={a.code}>{a.label}{a.qty > 1 ? ` × ${a.qty}` : ""} ({money(adderAmount(a))}, included above)</li>)}
-              <li>Manufacturer warranty registration, done for you</li>
-              <li>{company} 2-year labor warranty</li>
+                  ? <li key={a.code}><Ico.check /><span>{a.label} <s>{money(a.value)}</s> <b className="free">FREE</b></span></li>
+                  : <li key={a.code}><Ico.check />{a.label}{a.qty > 1 ? ` × ${a.qty}` : ""} ({money(adderAmount(a))}, in your price)</li>)}
+              <li><Ico.check />Manufacturer warranty registration, done for you</li>
+              <li><Ico.check />{company} 2-year labor warranty</li>
             </ul>
           </div>
-          <div>
-            <h3>Optional add-ons</h3>
-            <ul className="plain">
-              {(options[0]?.addons ?? []).filter((a) => a.price > 0).map((a) => (
-                <li key={a.code}><span>{a.label}</span><span>{money(a.price)}</span></li>
-              ))}
-            </ul>
+          <div className="qd-side">
             {Number(q.rebate) > 0 && (
-              <p className="rebate-note"><b>{q.rebate_label || "Rebate"}: {money(q.rebate)}.</b> {/silicon valley power/i.test(q.rebate_label ?? "") ? "We handle the paperwork and the utility pays us directly, so you never front it." : "We file the paperwork for you; the utility sends your rebate check."}</p>
+              <div className="qd-rebate">
+                <span className="qd-rebate-ico"><Ico.gift /></span>
+                <div>
+                  <b>{money(q.rebate)} {q.rebate_label || "rebate"}</b>
+                  <p>{/silicon valley power/i.test(q.rebate_label ?? "")
+                    ? "Already taken off your price. We file it and the utility pays us directly, so you never front it or wait on a check."
+                    : "We file the paperwork for you, and the utility sends your rebate check."}</p>
+                </div>
+              </div>
             )}
-            {q.notes && <p className="doc-note">{q.notes}</p>}
+            {(options[0]?.addons ?? []).some((a) => a.price > 0) && (
+              <div className="qd-box">
+                <h2 className="qd-h3">Optional add-ons</h2>
+                <ul className="qd-add">
+                  {(options[0]?.addons ?? []).filter((a) => a.price > 0).map((a) => (
+                    <li key={a.code}><span>{a.label}</span><b>{money(a.price)}</b></li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {q.notes && <div className="qd-note"><b>Note from {specialist}:</b> {q.notes}</div>}
           </div>
         </section>
 
-        <section className="doc-terms">
-          <h3>Next steps</h3>
-          <ol>
-            <li>Pick your option and sign. A deposit of 10% or $1,000, whichever is less, locks in your price and install date.</li>
-            <li>We pull the permit and schedule your install, usually within days.</li>
-            <li>The balance is due when the system is installed, started up, and running.</li>
-          </ol>
-          <p className="fine">
-            This quote is based on the photos, videos, and answers you provided. If we find a condition on install day that
-            changes the work, we'll explain it and get your written approval before doing anything extra. You have the
-            right to cancel as described in your contract.
-          </p>
+        {/* Timeline */}
+        <h2 className="qd-h2">What happens next</h2>
+        <section className="qd-steps">
+          {[
+            ["1", "Pick & sign", "A deposit of 10% or $1,000, whichever is less, locks your price and install date."],
+            ["2", "We pull the permit", "And schedule your install, usually within days."],
+            ["3", "Install day", "Our crew installs, starts up, and tests everything. Most jobs take one day."],
+            ["4", "Pay & relax", "The balance is due once it's installed and running. We file your rebate and warranty."],
+          ].map(([n, t, d]) => (
+            <div key={n} className="qd-step"><span className="qd-num">{n}</span><b>{t}</b><small>{d}</small></div>
+          ))}
         </section>
 
-        <footer className="doc-foot">
-          <span>{co.name}</span>
-          <span>{co.license_number ? `CSLB Lic. #${co.license_number}` : <em className="no-print-hint">Add your CSLB license # in Settings before sending</em>}</span>
-          <span>{[co.phone, co.website].filter(Boolean).join(" · ")}</span>
+        {/* Promise */}
+        <section className="qd-guar">
+          <span className="qd-guar-ico"><Ico.shield /></span>
+          <div>
+            <b>Our no-surprise promise</b>
+            <p>
+              This quote is based on the photos, videos, and answers you sent us. If we find something on install day that changes
+              the work, we'll show you, explain it, and get your written approval before doing anything extra. No pressure, ever.
+              You have the right to cancel as described in your contract.
+            </p>
+          </div>
+        </section>
+
+        <footer className="qd-foot">
+          <div className="qd-ask">
+            <b>Questions? Talk to {specialist}.</b>
+            <span>{[co.phone && `Call or text ${co.phone}`, co.website].filter(Boolean).join(" · ")}</span>
+          </div>
+          <div className="qd-legal">
+            <span>{co.name}</span>
+            <span>{co.license_number ? `CSLB Lic. #${co.license_number}` : <em className="no-print-hint">Add your CSLB license # in Settings before sending</em>}</span>
+            <span>Valid through {fmt(validUntil)}</span>
+          </div>
         </footer>
       </article>
     </div>
