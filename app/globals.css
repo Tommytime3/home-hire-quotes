@@ -132,3 +132,19 @@ button.secondary { flex: 0 0 96px; background: #fff; color: var(--ink); border: 
   width: 72px; height: 72px; margin: 0 auto 20px; border-radius: 50%;
   background: var(--brand); color: #fff; font-size: 34px; font-weight: 700; display: grid; place-items: center;
 }
+
+/* House map: 3x3 grid, back of house at top, street at bottom */
+.house { margin-top: 4px; }
+.house-label { display: block; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 6px 0; }
+.zones {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  padding: 8px; border: 2px solid #b9c3be; border-radius: 6px 6px 10px 10px; background: #f8faf9;
+  position: relative;
+}
+.zone {
+  aspect-ratio: 1.25; border: 1.5px dashed #c6cfca; border-radius: 8px; background: #fff;
+  font-size: 22px; color: var(--brand); cursor: pointer; transition: background .15s, border-color .15s;
+}
+.zone.on { background: var(--brand-soft); border: 2px solid var(--brand); }
+.option.unsure { margin-top: 10px; }
+.zone-picked { margin: 10px 0 0; text-align: center; font-weight: 600; color: var(--brand); font-size: 15px; }

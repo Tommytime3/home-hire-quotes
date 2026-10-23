@@ -15,8 +15,9 @@ type Upload = {
 };
 
 type Capture = { step: string; title: string; hint: string; kind: "photo" | "video"; required?: boolean };
-type Choice = { key: string; label: string; options: [string, string][] };
-type Field = { key: string; label: string; type: "text" | "tel" | "email" | "number"; required?: boolean };
+type Choice = { key: string; label: string; options: [string, string][]; required?: boolean; forTypes?: JobType[] };
+type Field = { key: string; label: string; type: "text" | "tel" | "email" | "number"; required?: boolean; forTypes?: JobType[] };
+type Zone = { key: string; label: string; required?: boolean; forTypes?: JobType[] };
 type Step = {
   id: string;
   title: string;
@@ -24,6 +25,7 @@ type Step = {
   forTypes?: JobType[];
   fields?: Field[];
   choices?: Choice[];
+  zones?: Zone[];
   captures?: Capture[];
   tip?: string;
 };
@@ -49,6 +51,7 @@ const STEPS: Step[] = [
       {
         key: "job_type",
         label: "What are you replacing?",
+        required: true,
         options: [
           ["ducted_heat_pump", "Heating & AC system"],
           ["ductless", "Ductless mini-split"],
@@ -91,7 +94,8 @@ const STEPS: Step[] = [
     choices: [
       {
         key: "indoor_location",
-        label: "Where is it?",
+        label: "What kind of space is it in?",
+        required: true,
         options: [
           ["garage", "Garage"],
           ["closet", "Hall or interior closet"],
@@ -103,6 +107,7 @@ const STEPS: Step[] = [
         ],
       },
     ],
+    zones: [{ key: "indoor_zone", label: "Where in your home is it?", required: true }],
     captures: [
       { step: "indoor_unit", title: "Film the unit and the space around it", hint: "Show how much room there is on each side and above it.", kind: "video", required: true },
       { step: "indoor_data_plate", title: "Photo of the unit's label", hint: "Usually inside the front panel door. Get close and make sure it's sharp.", kind: "photo", required: true },
@@ -114,6 +119,23 @@ const STEPS: Step[] = [
     title: "Your water heater",
     lead: "Show us the tank and the space around it.",
     forTypes: ["heat_pump_water_heater"],
+    choices: [
+      {
+        key: "water_heater_location",
+        label: "What kind of space is it in?",
+        required: true,
+        options: [
+          ["garage", "Garage"],
+          ["closet", "Closet"],
+          ["laundry", "Laundry or utility room"],
+          ["attic", "Attic"],
+          ["basement", "Basement"],
+          ["outside", "Outside"],
+          ["other", "Somewhere else"],
+        ],
+      },
+    ],
+    zones: [{ key: "water_heater_zone", label: "Where in your home is it?", required: true }],
     captures: [
       { step: "water_heater", title: "Film the water heater and the space around it", hint: "Show the floor, ceiling, and the pipes on top.", kind: "video", required: true },
       { step: "indoor_data_plate", title: "Photo of the tank's label", hint: "The sticker with the model number and size in gallons.", kind: "photo", required: true },
@@ -132,6 +154,20 @@ const STEPS: Step[] = [
     forTypes: ALL,
     choices: [
       {
+        key: "panel_location",
+        label: "Where is your panel?",
+        required: true,
+        options: [
+          ["outside_wall", "Outside, on a wall"],
+          ["garage", "Garage"],
+          ["hallway", "Hallway or closet"],
+          ["laundry", "Laundry or utility room"],
+          ["basement", "Basement"],
+          ["other", "Somewhere else"],
+          ["unsure", "I can't find it"],
+        ],
+      },
+      {
         key: "service_lines",
         label: "How does power come to your house?",
         options: [
@@ -146,6 +182,10 @@ const STEPS: Step[] = [
       { step: "panel", title: "Photo of the panel with the door open", hint: "Show all the breakers. Don't remove any covers.", kind: "photo", required: true },
       { step: "panel_label", title: "Photo of the main breaker", hint: "The big breaker at the top, usually marked 100 or 200.", kind: "photo", required: true },
       { step: "service_lines", title: "Photo of where power enters the house", hint: "The wires or meter outside, near the panel.", kind: "photo" },
+    ],
+    zones: [{ key: "panel_zone", label: "Where in your home is the panel?", required: true }],
+    fields: [
+      { key: "steps_indoor_to_panel", label: "About how many steps from the water heater to the panel?", type: "number", forTypes: ["heat_pump_water_heater"] },
     ],
   },
   {
@@ -162,8 +202,34 @@ const STEPS: Step[] = [
   {
     id: "ducts",
     title: "Your vents",
-    lead: "Count the vents that blow air into rooms, and the larger grilles that pull air back in.",
+    lead: "Count the vents that blow air into rooms, and the larger grilles that pull air back in. Where they sit tells us how your system is set up.",
     forTypes: ["ducted_heat_pump"],
+    choices: [
+      {
+        key: "supply_location",
+        label: "Where are the vents that blow air?",
+        required: true,
+        options: [
+          ["floor", "In the floor"],
+          ["ceiling", "In the ceiling"],
+          ["high_wall", "High on the walls"],
+          ["mixed", "A mix"],
+          ["unsure", "Not sure"],
+        ],
+      },
+      {
+        key: "return_location",
+        label: "Where is the big return grille (the one that pulls air in)?",
+        required: true,
+        options: [
+          ["ceiling", "In the ceiling"],
+          ["high_wall", "High on a wall"],
+          ["low_wall", "Low on a wall or in the floor"],
+          ["closet_door", "On the closet door where the unit is"],
+          ["unsure", "Not sure"],
+        ],
+      },
+    ],
     fields: [
       { key: "supply_register_count", label: "Vents that blow air (supply)", type: "number" },
       { key: "return_count", label: "Large return grilles", type: "number" },
@@ -211,13 +277,18 @@ export default function CapturePage() {
   const step = steps[index];
   const isLast = !!jobType && index === steps.length - 1;
 
+  function visible<T extends { forTypes?: JobType[] }>(items?: T[]): T[] {
+    return (items ?? []).filter((i) => !i.forTypes || (jobType !== null && i.forTypes.includes(jobType)));
+  }
+
   function set(key: string, value: string) {
     setAnswers((a) => ({ ...a, [key]: value }));
   }
 
   function missing(): string | null {
-    for (const f of step.fields ?? []) if (f.required && !answers[f.key]?.trim()) return f.label;
-    for (const c of step.choices ?? []) if (step.id === "contact" && !answers[c.key]) return c.label;
+    for (const f of visible(step.fields)) if (f.required && !answers[f.key]?.trim()) return f.label;
+    for (const c of visible(step.choices)) if (c.required && !answers[c.key]) return c.label;
+    for (const z of visible(step.zones)) if (z.required && !answers[z.key]) return z.label;
     for (const cap of step.captures ?? [])
       if (cap.required && !uploads.some((u) => u.step === cap.step && u.status === "done")) return cap.title;
     if (uploads.some((u) => u.status === "uploading")) return "wait for uploads to finish";
@@ -329,7 +400,7 @@ export default function CapturePage() {
         <h1>{step.title}</h1>
         <p className="lead">{step.lead}</p>
 
-        {step.choices?.map((c) => (
+        {visible(step.choices).map((c) => (
           <section className="card" key={c.key}>
             <h2>{c.label}</h2>
             <div className="options">
@@ -345,6 +416,43 @@ export default function CapturePage() {
                 </button>
               ))}
             </div>
+          </section>
+        ))}
+
+        {visible(step.zones).map((z) => (
+          <section className="card" key={z.key}>
+            <h2>{z.label}</h2>
+            <p>Imagine standing in the street looking at your house. Tap the area where it is.</p>
+            <div className="house" role="radiogroup" aria-label={z.label}>
+              <span className="house-label">Back of house</span>
+              <div className="zones">
+                {ZONES.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={answers[z.key] === value}
+                    aria-label={label}
+                    className={`zone ${answers[z.key] === value ? "on" : ""}`}
+                    onClick={() => set(z.key, value)}
+                  >
+                    {answers[z.key] === value ? "●" : ""}
+                  </button>
+                ))}
+              </div>
+              <span className="house-label">Front of house (street side)</span>
+            </div>
+            {answers[z.key] && answers[z.key] !== "unsure" && (
+              <p className="zone-picked">Selected: {ZONES.find(([v]) => v === answers[z.key])?.[1]}</p>
+            )}
+            <button
+              type="button"
+              className={`option unsure ${answers[z.key] === "unsure" ? "on" : ""}`}
+              onClick={() => set(z.key, "unsure")}
+            >
+              <span className="radio" aria-hidden="true" />
+              Not sure
+            </button>
           </section>
         ))}
 
@@ -401,9 +509,9 @@ export default function CapturePage() {
           );
         })}
 
-        {step.fields && (
+        {visible(step.fields).length > 0 && (
           <section className="card">
-            {step.fields.map((f) => (
+            {visible(step.fields).map((f) => (
               <div className="field-wrap" key={f.key}>
                 <label className="field" htmlFor={f.key}>{f.label}</label>
                 <input
@@ -438,6 +546,12 @@ export default function CapturePage() {
     </>
   );
 }
+
+const ZONES: [string, string][] = [
+  ["back_left", "Back left"], ["back_center", "Back middle"], ["back_right", "Back right"],
+  ["middle_left", "Middle left"], ["middle", "Center of the house"], ["middle_right", "Middle right"],
+  ["front_left", "Front left"], ["front_center", "Front middle"], ["front_right", "Front right"],
+];
 
 const AUTOCOMPLETE: Record<string, string> = {
   first_name: "given-name",
