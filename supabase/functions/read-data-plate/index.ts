@@ -66,7 +66,7 @@ async function readOne(apiKey: string, bytes: Uint8Array, mediaType: string) {
       }],
     }),
   });
-  if (!res.ok) throw new Error(`vision ${res.status}`);
+  if (!res.ok) { const t = await res.text(); console.log("read-data-plate: vision error", res.status, t.slice(0, 300)); throw new Error(`vision ${res.status}`); }
   const out = await res.json();
   const use = out.content?.find((c: any) => c.type === "tool_use");
   return use?.input ?? null;
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
   if (!jobId || !/^[0-9a-f-]{36}$/i.test(jobId)) return json({ error: "bad request" }, 400);
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) return json({ ok: true, skipped: "no_api_key" });
+  if (!apiKey) { console.log("read-data-plate: no ANTHROPIC_API_KEY secret"); return json({ ok: true, skipped: "no_api_key" }); }
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: job } = await db.from("jobs").select("id, contractor_id, job_type, plate_source").eq("id", jobId).maybeSingle();
@@ -103,7 +103,8 @@ Deno.serve(async (req) => {
 
   let q = db.from("job_media").select("id, step, storage_path, ai_status").eq("job_id", jobId).eq("kind", "photo").in("step", PLATE_STEPS);
   if (!force) q = q.or("ai_status.is.null,ai_status.eq.pending"); // new photos start as "pending"
-  const { data: media } = await q.order("created_at");
+  const { data: media, error: mediaErr } = await q.order("created_at");
+  console.log("read-data-plate:", JSON.stringify({ job: jobId, force, photos: media?.length ?? 0, mediaErr: mediaErr?.message ?? null }));
   const results: any[] = [];
 
   for (const m of media ?? []) {
@@ -123,7 +124,8 @@ Deno.serve(async (req) => {
       const read = await readOne(apiKey, bytes, type);
       await db.from("job_media").update({ ai_status: read ? "done" : "failed", ai_extracted: read }).eq("id", m.id);
       if (read) results.push({ step: m.step, ...read });
-    } catch {
+    } catch (e) {
+      console.log("read-data-plate: photo failed", m.id, String(e));
       await db.from("job_media").update({ ai_status: "failed" }).eq("id", m.id);
     }
   }
