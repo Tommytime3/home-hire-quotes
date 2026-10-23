@@ -43,6 +43,68 @@ function MiniMap({ marks }: { marks: { zone: string | null; tag: string }[] }) {
   );
 }
 
+const FUELS: [string, string][] = [["gas", "Gas"], ["propane", "Propane"], ["electric", "Electric"], ["heat_pump", "Heat pump"]];
+
+// What the old equipment's label says. Read automatically from the homeowner's photo;
+// anything typed here wins over the automatic read and sizes the quote.
+function LabelCard({ job, onChange }: { job: Job; onChange: (patch: Partial<Job>) => void }) {
+  const isWh = job.job_type === "heat_pump_water_heater";
+  const [gal, setGal] = useState<string>(job.existing_gallons ? String(job.existing_gallons) : "");
+  const [fuel, setFuel] = useState<string>(job.existing_fuel ?? "");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const n = Number(gal);
+    const patch = { existing_gallons: n >= 10 && n <= 150 ? Math.round(n) : null, existing_fuel: fuel || null, plate_source: "staff" };
+    const { error } = await supabase.from("jobs").update(patch).eq("id", job.id);
+    setMsg(error ? "Couldn't save" : "Saved. New quotes use this size.");
+    if (!error) onChange(patch);
+  }
+
+  async function reread() {
+    setBusy(true);
+    setMsg("Reading the label…");
+    const { data, error } = await supabase.functions.invoke("read-data-plate", { body: { job_id: job.id, force: true } });
+    setBusy(false);
+    if (error) return setMsg("Couldn't read it. Check the photo below and type the size in.");
+    if (data?.skipped === "no_api_key") return setMsg("Label reading isn't switched on yet (needs the AI key in Supabase).");
+    const { data: fresh } = await supabase.from("jobs").select("*").eq("id", job.id).maybeSingle();
+    if (fresh) {
+      onChange(fresh);
+      setGal(fresh.existing_gallons ? String(fresh.existing_gallons) : "");
+      setFuel(fresh.existing_fuel ?? "");
+    }
+    setMsg(data?.label?.is_label ? `Read it (${data.label.confidence} confidence)${data.label.note ? `: ${data.label.note}` : ""}` : "Couldn't find a readable label in the photo.");
+  }
+
+  const read = [job.existing_brand, job.existing_model && `model ${job.existing_model}`, job.existing_serial && `serial ${job.existing_serial}`, job.existing_year && `made ${job.existing_year}`].filter(Boolean).join(" · ");
+
+  return (
+    <section className="card">
+      <div className="quote-card-head">
+        <h2>From the label</h2>
+        <button className="btn ghost" disabled={busy} onClick={reread}>{busy ? "Reading…" : "Read label again"}</button>
+      </div>
+      {read ? <p>{read}{job.existing_tons ? ` · ${job.existing_tons} ton` : ""}</p> : <p className="muted">Not read yet.</p>}
+      {job.plate_source && <p className="muted small">{job.plate_source === "ai" ? "Read automatically. Double-check it against the photo." : "Entered by you."}</p>}
+      {isWh && (
+        <div className="label-edit">
+          <label className="lbl">Tank size now (gallons)</label>
+          <input type="number" inputMode="numeric" value={gal} onChange={(e) => setGal(e.target.value)} placeholder="e.g. 50" />
+          <label className="lbl">Fuel now</label>
+          <select value={fuel} onChange={(e) => setFuel(e.target.value)}>
+            <option value="">Not sure</option>
+            {FUELS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <button className="btn" onClick={save}>Save</button>
+        </div>
+      )}
+      {msg && <p className="tip">{msg}</p>}
+    </section>
+  );
+}
+
 export default function JobPage() {
   const session = useSession();
   const [id, setId] = useState<string | null>(null);
@@ -138,6 +200,8 @@ export default function JobPage() {
           </a>
         ))}
       </section>
+
+      <LabelCard job={job} onChange={(patch) => setJob({ ...job, ...patch })} />
 
       <div className="actions">
         <a className="act" href={`tel:${phoneDigits}`}>Call</a>

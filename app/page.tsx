@@ -349,6 +349,25 @@ function newId() {
   return crypto.randomUUID();
 }
 
+// Phone photos are 3-8 MB (and HEIC on iPhones). Re-save them as a JPEG up to 2400 px on the
+// long side: labels stay sharp, uploads are faster on cell signal, and the label reader can use them.
+// If the browser can't decode the photo, upload the original.
+async function shrinkPhoto(file: File): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.type === "image/jpeg" && file.size < 2.5 * 1024 * 1024) return file;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    return blob && blob.size > 0 ? blob : file;
+  } catch {
+    return file;
+  }
+}
+
 export default function CapturePage() {
   const [contractorId, setContractorId] = useState(DEFAULT_CONTRACTOR_ID);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -433,9 +452,10 @@ export default function CapturePage() {
         continue;
       }
       try {
-        const ext = (file.name.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase();
+        const body = kind === "photo" ? await shrinkPhoto(file) : file;
+        const ext = body !== file ? "jpg" : (file.name.split(".").pop() || (kind === "video" ? "mp4" : "jpg")).toLowerCase();
         const path = `jobs/${id}/${cap.step}-${Date.now()}.${ext}`;
-        const up = await supabase.storage.from("job-media").upload(path, file, { contentType: file.type || undefined });
+        const up = await supabase.storage.from("job-media").upload(path, body, { contentType: body.type || undefined });
         if (up.error) throw up.error;
         const rec = await supabase.from("job_media").insert({ job_id: id, step: cap.step, kind, storage_path: path });
         if (rec.error) throw rec.error;

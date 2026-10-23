@@ -8,8 +8,8 @@ import { useContractor, monthlyPayment } from "../../../lib/contractor";
 import { EquipmentArt } from "../../../lib/illustrations";
 import { label } from "../../../lib/labels";
 import {
-  CatalogItem, PriceItem, QuoteAdder, QuoteDraft, QuoteOption, SystemPrice, TIER_LABEL, Tier,
-  adderAmount, defaultBullets, describeEquipment, guessTons, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment,
+  CatalogItem, PriceItem, QuoteAdder, QuoteDraft, QuoteOption, SystemPrice, TIER_LABEL, TIERS, Tier,
+  adderAmount, defaultBullets, describeEquipment, guessTons, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater,
 } from "../../../lib/quote";
 
 const SIZES = [2, 3, 4, 5];
@@ -36,6 +36,7 @@ export default function QuoteBuilder() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [tankFor, setTankFor] = useState<number | null>(null);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -91,6 +92,7 @@ export default function QuoteBuilder() {
 
   const jobType: string = job?.job_type ?? "";
   const isDucted = jobType === "ducted_heat_pump";
+  const isWh = jobType === "heat_pump_water_heater";
   const adderChoices = useMemo(
     () => items.filter((i) => i.applies_to.includes(jobType) && i.kind === "adder" && !(draft?.adders ?? []).some((a) => a.code === i.code)),
     [items, jobType, draft?.adders]
@@ -130,6 +132,15 @@ export default function QuoteBuilder() {
     });
   }
 
+  // Water heaters: re-pick every tier for a tank size (each brand's next size up).
+  function changeTank(gallons: number) {
+    setTankFor(gallons);
+    setDraft((d) => d && { ...d, options: d.options.map((o) => {
+      const wh = pickWaterHeater(catalog, o.tier, gallons);
+      return { ...o, ...applyPicks(o, wh ? [wh] : []) };
+    }) });
+  }
+
   function chooseOutdoor(o: QuoteOption, outdoorId: string) {
     const outdoor = catalog.find((c) => c.id === outdoorId);
     if (!outdoor) return setOpt(o.tier, applyPicks(o, []));
@@ -166,6 +177,12 @@ export default function QuoteBuilder() {
   const outdoorChoices = catalog
     .filter((c) => c.category === "heat_pump_outdoor" && Number(c.capacity_tons) === Number(draft.size_tons))
     .sort((a, b) => a.brand.localeCompare(b.brand));
+  const whChoices = catalog
+    .filter((c) => c.category === "heat_pump_water_heater")
+    .sort((a, b) => TIERS.indexOf(b.tier ?? "good") - TIERS.indexOf(a.tier ?? "good") || Number(a.gallons) - Number(b.gallons));
+  const whSizes = Array.from(new Set(whChoices.map((c) => Number(c.gallons)).filter(Boolean))).sort((a, b) => a - b);
+  // The highlighted size: what you picked, or the smallest size that covers their current tank.
+  const currentTank = whSizes.find((g) => g >= (Number(job.existing_gallons) || 50)) ?? whSizes[whSizes.length - 1] ?? null;
   const tonsGuess = guessTons(job.square_feet);
   const financeReady = co?.finance_apr != null && !!co?.finance_months;
 
@@ -191,6 +208,25 @@ export default function QuoteBuilder() {
           <div className="seg">
             {SIZES.map((s) => (
               <button key={s} type="button" className={Number(draft.size_tons) === s ? "on" : ""} onClick={() => changeSize(s)}>{s} ton</button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {isWh && (
+        <section className="panel size-panel">
+          <div>
+            <h2>Tank size</h2>
+            <p className="muted small">
+              {job.existing_gallons
+                ? `Their label: ${job.existing_gallons} gal${job.existing_fuel ? ` ${job.existing_fuel}` : ""}${job.existing_brand ? `, ${job.existing_brand}` : ""}${job.existing_year ? ` (${job.existing_year})` : ""}${job.plate_source === "ai" ? " · read automatically, check the photo" : ""}. `
+                : "Tank size not read yet: check the label photo. "}
+              Each brand gets its next size up.
+            </p>
+          </div>
+          <div className="seg">
+            {whSizes.map((g) => (
+              <button key={g} type="button" className={(tankFor ?? currentTank) === g ? "on" : ""} onClick={() => changeTank(g)}>{g} gal</button>
             ))}
           </div>
         </section>
@@ -260,6 +296,28 @@ export default function QuoteBuilder() {
                     )}
                   </>
                 )}
+                {isWh && (() => {
+                  const wh = picked.find((p) => p.category === "heat_pump_water_heater");
+                  const door = Number(job.door_width_in) || null;
+                  const dia = wh ? Number(wh.diameter_in ?? wh.width_in) || null : null;
+                  return (
+                    <>
+                      <label className="lbl">Water heater</label>
+                      <select value={wh?.id ?? ""} onChange={(e) => { const it = catalog.find((c) => c.id === e.target.value); setOpt(o.tier, applyPicks(o, it ? [it] : [])); }}>
+                        <option value="">Choose a water heater…</option>
+                        {whChoices.map((c) => (
+                          <option key={c.id} value={c.id}>{c.brand} {c.gallons} gal · {c.model_number}{c.tier ? ` (${TIER_LABEL[c.tier]})` : ""}</option>
+                        ))}
+                      </select>
+                      {wh && (
+                        <p className="spec">
+                          {wh.gallons} gal · {inches(dia)} wide × {inches(wh.height_in)} tall
+                          {door && dia ? (dia + 1 > door ? ` · ⚠ Door is ${inches(door)}: tight or won't fit` : ` · Fits the ${inches(door)} door`) : ""}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
 
                 <label className="lbl">Card bullets (one per line)</label>
                 <textarea rows={4} value={(o.bullets ?? []).join("\n")} onChange={(e) => setOpt(o.tier, { bullets: e.target.value.split("\n") })} />

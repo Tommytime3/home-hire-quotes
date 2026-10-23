@@ -9,6 +9,8 @@ type Estimate = {
   rebate: number;
   rebate_label: string | null;
   tons: number | null;
+  gallons?: number | null;
+  existing_gallons?: number | null;
   company: string;
   phone: string | null;
   available: boolean;
@@ -20,7 +22,7 @@ const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 // Each step is real work done by the price estimate; the pacing just lets people read it.
 function stepsFor(city?: string) {
   return [
-    "Reading your answers",
+    "Reading your equipment label",
     "Saving your photos and videos",
     "Matching the right equipment to your home",
     `Checking rebates${city ? ` in ${city}` : ""}`,
@@ -43,7 +45,13 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
   const [laterOpen, setLaterOpen] = useState(false);
 
   useEffect(() => {
-    supabase.rpc("job_estimate", { p_job_id: jobId }).then(({ data }) => setEst((data as Estimate) ?? null));
+    // Read the equipment label first (tank size, fuel) so the estimate is sized right.
+    // Never hold the homeowner up more than 20 seconds for it.
+    const read = supabase.functions.invoke("read-data-plate", { body: { job_id: jobId } }).catch(() => null);
+    const timeout = new Promise((r) => setTimeout(r, 20000));
+    Promise.race([read, timeout])
+      .then(() => supabase.rpc("job_estimate", { p_job_id: jobId }))
+      .then(({ data }) => setEst((data as Estimate) ?? null), () => setEst(null));
     const t = setInterval(() => setShown((n) => (n >= steps.length ? n : n + 1)), 1500);
     return () => clearInterval(t);
   }, [jobId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -89,6 +97,13 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
         <section className="est-card">
           <span className="est-cap">Estimated price, installed</span>
           <strong className="est-range">{same ? `About ${money(est!.low!)}` : `${money(est!.low!)} – ${money(est!.high!)}`}</strong>
+          {est!.gallons ? (
+            <p className="est-size">
+              {est!.existing_gallons
+                ? `Sized from your label: your ${est!.existing_gallons}-gallon tank → ${est!.gallons}-gallon heat pump water heater`
+                : `Priced for a ${est!.gallons}-gallon heat pump water heater`}
+            </p>
+          ) : null}
           {afterRebate !== null && (
             <p className="est-rebate">
               With your {est!.rebate_label ?? "rebate"} ({money(est!.rebate)}): <b>as low as {money(afterRebate)}</b>

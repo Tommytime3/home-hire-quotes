@@ -6,9 +6,20 @@ export const TIER_LABEL: Record<Tier, string> = { good: "Good", better: "Better"
 
 // Short selling points shown on each card, generated from the equipment and editable.
 export function defaultBullets(items: CatalogItem[], jobType: string): string[] {
+  const wh = items.find((i) => i.category === "heat_pump_water_heater");
+  if (wh || jobType === "heat_pump_water_heater") {
+    const w: string[] = [];
+    if (wh?.gallons) w.push(`${wh.gallons}-gallon tank`);
+    w.push("Up to 4x more efficient than a gas tank");
+    if (wh?.brand === "Navien") w.push("Premium Navien build with smart Wi-Fi controls");
+    if (wh?.brand === "Bradford White") w.push("Bradford White: sold only through licensed pros");
+    if (wh?.brand === "Rheem") w.push("10-year tank and parts warranty");
+    w.push("Qualifies for utility rebates");
+    return w.slice(0, 4);
+  }
   const outdoor = items.find((i) => i.category === "heat_pump_outdoor") ?? items[0];
   const b: string[] = [];
-  if (!outdoor) return jobType === "heat_pump_water_heater" ? ["Up to 4x more efficient than a gas tank", "Qualifies for utility rebates", "Installed in one day"] : [];
+  if (!outdoor) return [];
   if (outdoor.seer2) b.push(`${outdoor.seer2} SEER2 cooling efficiency`);
   if (outdoor.hspf2) b.push(`${outdoor.hspf2} HSPF2 heating efficiency`);
   if (/inverter|SUZ|PUZ|MXZ/i.test(`${outdoor.series ?? ""} ${outdoor.model_number}`)) b.push("Quiet variable-speed inverter");
@@ -32,12 +43,15 @@ export type CatalogItem = {
   series: string | null;
   capacity_tons: number | null;
   capacity_btu: number | null;
+  gallons?: number | null;
+  uef?: number | null;
   refrigerant: string | null;
   seer2: number | null;
   hspf2: number | null;
   width_in: number | null;
   depth_in: number | null;
   height_in: number | null;
+  diameter_in?: number | null;
   weight_lb: number | null;
   min_circuit_amps: number | null;
   max_breaker_amps: number | null;
@@ -132,6 +146,11 @@ export function optionMargin(o: QuoteOption, q: QuoteDraft, catalog: CatalogItem
 }
 
 export function describeEquipment(items: CatalogItem[]): string {
+  const wh = items.find((i) => i.category === "heat_pump_water_heater");
+  if (wh) {
+    const name = [wh.brand, wh.series].filter(Boolean).join(" ");
+    return `${name} ${wh.gallons ? `${wh.gallons}-gallon ` : ""}heat pump water heater (${wh.model_number})${wh.uef ? `. ${wh.uef} UEF.` : "."}`;
+  }
   const outdoor = items.find((i) => i.category === "heat_pump_outdoor" || i.category === "ductless_outdoor");
   const indoor = items.find((i) => i.category === "air_handler" || i.category === "furnace");
   const parts: string[] = [];
@@ -148,6 +167,12 @@ export function describeEquipment(items: CatalogItem[]): string {
   return parts.join(" with ") + (specs ? `. ${specs}.` : ".");
 }
 
+const WH_PITCH: Record<Tier, string> = {
+  good: "A proven heat pump water heater at the best price, with big savings over gas.",
+  better: "A trusted pro-only brand with a great balance of efficiency and value.",
+  best: "Our premium choice: top efficiency, quiet operation, and smart controls from your phone.",
+};
+
 const DEFAULT_PITCH: Record<Tier, string> = {
   good: "Reliable, efficient inverter comfort at the best price, backed by a long manufacturer warranty.",
   better: "A trusted name-brand system with a great balance of comfort, efficiency, and value.",
@@ -163,12 +188,12 @@ export function newDraft(job: Record<string, any>, prices: SystemPrice[], items:
 
   const options: QuoteOption[] = TIERS.map((tier) => {
     const price = prices.find((p) => p.job_type === jobType && p.tier === tier && Number(p.size_tons) === Number(size));
-    const picks = pickEquipment(catalog, tier, size, jobType);
+    const picks = pickEquipment(catalog, tier, size, jobType, job.existing_gallons);
     return {
       tier,
       enabled: !!price || jobType === "heat_pump_water_heater",
       title: picks.length ? `${picks[0].brand}` : TIER_LABEL[tier],
-      pitch: DEFAULT_PITCH[tier],
+      pitch: jobType === "heat_pump_water_heater" ? WH_PITCH[tier] : DEFAULT_PITCH[tier],
       equipment_ids: picks.map((p) => p.id),
       equipment_text: picks.length ? describeEquipment(picks) : "",
       image_url: imageFor(picks).url,
@@ -198,9 +223,21 @@ export function newDraft(job: Record<string, any>, prices: SystemPrice[], items:
   return { status: "draft", recommended: "better", size_tons: size || null, options, adders, permit, rebate, rebate_label, notes: "", crew_hours: 8 };
 }
 
-export function pickEquipment(catalog: CatalogItem[], tier: Tier, size: number, jobType: string): CatalogItem[] {
+// Water heaters: the smallest tank in this tier that's at least as big as what they have now.
+// Bigger than anything we sell: the biggest. Size unknown: 50 gallons.
+// Matches wh_size_for() in the database, which the homeowner's estimate uses.
+export function pickWaterHeater(catalog: CatalogItem[], tier: Tier, existingGallons: number | null | undefined): CatalogItem | null {
+  const list = catalog
+    .filter((c) => c.category === "heat_pump_water_heater" && c.tier === tier && c.gallons)
+    .sort((a, b) => Number(a.gallons) - Number(b.gallons));
+  if (!list.length) return null;
+  const want = Number(existingGallons) || 50;
+  return list.find((c) => Number(c.gallons) >= want) ?? list[list.length - 1];
+}
+
+export function pickEquipment(catalog: CatalogItem[], tier: Tier, size: number, jobType: string, existingGallons?: number | null): CatalogItem[] {
   if (jobType === "heat_pump_water_heater") {
-    const wh = catalog.find((c) => c.category === "heat_pump_water_heater" && c.tier === tier);
+    const wh = pickWaterHeater(catalog, tier, existingGallons);
     return wh ? [wh] : [];
   }
   const fits = (c: CatalogItem) => c.tier === tier && Number(c.capacity_tons) === Number(size);
