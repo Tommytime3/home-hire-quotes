@@ -51,12 +51,16 @@ function LabelCard({ job, onChange }: { job: Job; onChange: (patch: Partial<Job>
   const isWh = job.job_type === "heat_pump_water_heater";
   const [gal, setGal] = useState<string>(job.existing_gallons ? String(job.existing_gallons) : "");
   const [fuel, setFuel] = useState<string>(job.existing_fuel ?? "");
+  const [tons, setTons] = useState<string>(job.existing_tons ? String(job.existing_tons) : "");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function save() {
     const n = Number(gal);
-    const patch = { existing_gallons: n >= 10 && n <= 150 ? Math.round(n) : null, existing_fuel: fuel || null, plate_source: "staff" };
+    const t = Number(tons);
+    const patch = isWh
+      ? { existing_gallons: n >= 10 && n <= 150 ? Math.round(n) : null, existing_fuel: fuel || null, plate_source: "staff" }
+      : { existing_tons: t > 0 && t <= 6 ? t : null, plate_source: "staff" };
     const { error } = await supabase.from("jobs").update(patch).eq("id", job.id);
     setMsg(error ? "Couldn't save" : "Saved. New quotes use this size.");
     if (!error) onChange(patch);
@@ -74,6 +78,7 @@ function LabelCard({ job, onChange }: { job: Job; onChange: (patch: Partial<Job>
       onChange(fresh);
       setGal(fresh.existing_gallons ? String(fresh.existing_gallons) : "");
       setFuel(fresh.existing_fuel ?? "");
+      setTons(fresh.existing_tons ? String(fresh.existing_tons) : "");
     }
     setMsg(data?.label?.is_label ? `Read it (${data.label.confidence} confidence)${data.label.note ? `: ${data.label.note}` : ""}` : "Couldn't find a readable label in the photo.");
   }
@@ -96,6 +101,16 @@ function LabelCard({ job, onChange }: { job: Job; onChange: (patch: Partial<Job>
           <select value={fuel} onChange={(e) => setFuel(e.target.value)}>
             <option value="">Not sure</option>
             {FUELS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <button className="btn" onClick={save}>Save</button>
+        </div>
+      )}
+      {!isWh && (
+        <div className="label-edit">
+          <label className="lbl">System size now (tons)</label>
+          <select value={tons} onChange={(e) => setTons(e.target.value)}>
+            <option value="">Not sure</option>
+            {[1.5, 2, 2.5, 3, 3.5, 4, 5].map((t) => <option key={t} value={String(t)}>{t} ton</option>)}
           </select>
           <button className="btn" onClick={save}>Save</button>
         </div>

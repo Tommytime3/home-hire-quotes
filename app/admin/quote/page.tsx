@@ -9,7 +9,7 @@ import { EquipmentArt } from "../../../lib/illustrations";
 import { label } from "../../../lib/labels";
 import {
   CatalogItem, PriceItem, QuoteAdder, QuoteDraft, QuoteOption, SystemPrice, TIER_LABEL, TIERS, Tier,
-  adderAmount, defaultBullets, describeEquipment, guessTons, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater,
+  adderAmount, defaultBullets, describeEquipment, guessTons, sizeFromLabel, imageFor, inches, money, newDraft, optionMargin, optionTotals, pickEquipment, pickWaterHeater,
 } from "../../../lib/quote";
 
 const SIZES = [2, 3, 4, 5];
@@ -82,7 +82,7 @@ export default function QuoteBuilder() {
             rebate_label: existing.rebate_label ?? "", notes: existing.notes ?? "", crew_hours: Number(existing.crew_hours ?? 8),
           });
         } else {
-          setDraft(newDraft(j, (sp as SystemPrice[]) ?? [], (pi as PriceItem[]) ?? [], cat, guessTons(j.square_feet)));
+          setDraft(newDraft(j, (sp as SystemPrice[]) ?? [], (pi as PriceItem[]) ?? [], cat, sizeFromLabel(j.existing_tons) ?? guessTons(j.square_feet)));
         }
       } catch (e: any) {
         setError(e.message ?? "Couldn't load this quote.");
@@ -202,7 +202,10 @@ export default function QuoteBuilder() {
           <div>
             <h2>System size</h2>
             <p className="muted small">
-              {tonsGuess ? `${job.square_feet.toLocaleString()} sq ft ≈ ${tonsGuess} ton by your rule of thumb. ` : ""}Check the old unit's label in the photos.
+              {job.existing_tons
+                ? `Their label: ${job.existing_tons} ton${job.existing_brand ? ` ${job.existing_brand}` : ""}${job.existing_year ? ` (${job.existing_year})` : ""}${job.plate_source === "ai" ? ", read automatically: check the photo" : ""}. Quoted at the same size. `
+                : "Label not read yet: check the old unit's label in the photos. "}
+              {tonsGuess ? `${job.square_feet.toLocaleString()} sq ft ≈ ${tonsGuess} ton by your rule of thumb.` : ""}
             </p>
           </div>
           <div className="seg">

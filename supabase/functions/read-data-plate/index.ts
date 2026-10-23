@@ -33,7 +33,7 @@ const TOOL = {
       gallons: { type: ["number", "null"], description: "Tank capacity in US gallons, water heaters only." },
       fuel: { type: ["string", "null"], enum: ["gas", "propane", "electric", "heat_pump", null] },
       year: { type: ["integer", "null"], description: "Manufacture year if printed, or decoded from the serial number when you are confident." },
-      tons: { type: ["number", "null"], description: "Cooling capacity in tons for AC / heat pumps (12,000 BTU = 1 ton). From the model number if clearly encoded." },
+      tons: { type: ["number", "null"], description: "Cooling capacity in tons for AC / heat pumps / air handlers (12,000 BTU/h = 1 ton). Use the rated cooling capacity if printed; otherwise decode it from the model number when the brand's pattern is clear (e.g. the 24/30/36/42/48/60 in a model number = 2/2.5/3/3.5/4/5 tons). Null for furnaces and water heaters." },
       input_btu: { type: ["integer", "null"] },
       confidence: { type: "string", enum: ["high", "medium", "low"] },
       note: { type: ["string", "null"], description: "Short note for the contractor, e.g. 'label partly blurry'." },
@@ -145,8 +145,12 @@ Deno.serve(async (req) => {
     if (isWh) {
       patch.existing_gallons = gal >= 10 && gal <= 150 ? Math.round(gal) : null;
       patch.existing_fuel = ["gas", "propane", "electric", "heat_pump"].includes(main.fuel) ? main.fuel : null;
-    } else if (Number(main.tons) > 0 && Number(main.tons) <= 6) {
-      patch.existing_tons = Number(main.tons);
+    } else {
+      // System size: the outdoor unit's label is the most reliable (an indoor furnace label often has no AC size).
+      // Only the first system: a second system's label never overwrites it.
+      const ok = (r: any) => r.is_label && Number(r.tons) > 0 && Number(r.tons) <= 6;
+      const src = results.find((r) => ok(r) && r.step === "outdoor_data_plate") ?? results.find((r) => ok(r) && r.step === "indoor_data_plate");
+      if (src) patch.existing_tons = Math.round(Number(src.tons) * 2) / 2;
     }
     await db.from("jobs").update(patch).eq("id", jobId);
   }

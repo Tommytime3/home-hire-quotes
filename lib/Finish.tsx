@@ -10,6 +10,8 @@ type Estimate = {
   rebate_label: string | null;
   tons: number | null;
   gallons?: number | null;
+  size_from?: string | null;
+  existing_tons?: number | null;
   existing_gallons?: number | null;
   company: string;
   phone: string | null;
@@ -97,6 +99,11 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
         <section className="est-card">
           <span className="est-cap">Estimated price, installed</span>
           <strong className="est-range">{same ? `About ${money(est!.low!)}` : `${money(est!.low!)} – ${money(est!.high!)}`}</strong>
+          {est!.tons && est!.size_from === "label" ? (
+            <p className="est-size">
+              Sized from your label: same as your {est!.existing_tons}-ton system{Number(est!.existing_tons) !== Number(est!.tons) ? ` (${est!.tons}-ton heat pump)` : ""}
+            </p>
+          ) : null}
           {est!.gallons ? (
             <p className="est-size">
               {est!.existing_gallons

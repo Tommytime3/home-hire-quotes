@@ -246,6 +246,15 @@ export function pickEquipment(catalog: CatalogItem[], tier: Tier, size: number, 
   return [outdoor, indoor].filter(Boolean) as CatalogItem[];
 }
 
+// Same size as the system they have now, from the old unit's label: the smallest size we sell
+// that covers it (2.5 ton -> 3 ton). Matches hvac_size_for() in the database.
+export function sizeFromLabel(tons: number | null | undefined): number | null {
+  const t = Number(tons);
+  if (!t || t <= 0) return null;
+  const sizes = [2, 3, 4, 5];
+  return sizes.find((s) => s >= t) ?? 5;
+}
+
 // Rough size guess from square footage, using 500-600 sq ft per ton (Comfort Air rule of thumb).
 export function guessTons(sqft: number | null | undefined): number | null {
   if (!sqft) return null;
