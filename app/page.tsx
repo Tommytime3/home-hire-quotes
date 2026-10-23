@@ -58,6 +58,30 @@ const STEPS: Step[] = [
           ["heat_pump_water_heater", "Water heater"],
         ],
       },
+      {
+        key: "home_type",
+        label: "What kind of home is it?",
+        required: true,
+        options: [
+          ["single_family", "Single-family house"],
+          ["townhouse", "Townhouse"],
+          ["condo_apartment", "Condo or apartment"],
+          ["adu_back_house", "Back house or ADU"],
+          ["duplex_multiplex", "Duplex or multi-unit building"],
+          ["mobile_home", "Mobile or manufactured home"],
+          ["other", "Something else"],
+        ],
+      },
+      {
+        key: "stories",
+        label: "How many stories?",
+        required: true,
+        options: [
+          ["1", "One story"],
+          ["2", "Two stories"],
+          ["3", "Three or more"],
+        ],
+      },
     ],
   },
   {
@@ -150,7 +174,7 @@ const STEPS: Step[] = [
   {
     id: "panel",
     title: "Your electrical panel",
-    lead: "This tells us if your panel can power a new heat pump. Please don't skip it.",
+    lead: "This tells us if your panel can power a new heat pump. Please don't skip it. Your main panel is usually outside where the power lines come in, right next to the meter. A panel inside the home, like in a closet or hallway, is usually a smaller sub panel.",
     forTypes: ALL,
     choices: [
       {
@@ -159,12 +183,23 @@ const STEPS: Step[] = [
         required: true,
         options: [
           ["outside_wall", "Outside, on a wall"],
+          ["meter_room", "Shared meter room (apartments and condos)"],
           ["garage", "Garage"],
           ["hallway", "Hallway or closet"],
           ["laundry", "Laundry or utility room"],
           ["basement", "Basement"],
           ["other", "Somewhere else"],
           ["unsure", "I can't find it"],
+        ],
+      },
+      {
+        key: "meter_at_panel",
+        label: "Is the electric meter (the round glass dial or digital display) right next to or built into this panel?",
+        required: true,
+        options: [
+          ["yes", "Yes, the meter is right there"],
+          ["no", "No, there's no meter here"],
+          ["unsure", "Not sure"],
         ],
       },
       {
@@ -181,6 +216,7 @@ const STEPS: Step[] = [
       { step: "panel_video", title: "Film the panel and the wall around it", hint: "Start a few steps back so we can see where it is, then move in close with the door open. About 10 seconds.", kind: "video", required: true },
       { step: "panel", title: "Photo of the panel with the door open", hint: "Show all the breakers. Don't remove any covers.", kind: "photo", required: true },
       { step: "panel_label", title: "Photo of the main breaker", hint: "The big breaker at the top, usually marked 100 or 200.", kind: "photo", required: true },
+      { step: "main_panel", title: "If that was a sub panel: photo of your main panel", hint: "The panel next to the meter, usually outside or in a shared meter room. Skip this if the panel above already has the meter.", kind: "photo" },
       { step: "service_lines", title: "Photo of where power enters the house", hint: "The wires or meter outside, near the panel.", kind: "photo" },
     ],
     zones: [{ key: "panel_zone", label: "Where in your home is the panel?", required: true }],
@@ -243,7 +279,6 @@ const STEPS: Step[] = [
     forTypes: ALL,
     fields: [
       { key: "square_feet", label: "Square feet", type: "number" },
-      { key: "stories", label: "Number of stories", type: "number" },
       { key: "year_built", label: "Year built (if you know)", type: "number" },
       { key: "notes", label: "Anything else we should know?", type: "text" },
     ],

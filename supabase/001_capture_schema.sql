@@ -60,7 +60,7 @@ create table public.job_media (
   step text not null check (step in (
     'outdoor_unit', 'outdoor_data_plate', 'line_set_route',
     'indoor_unit', 'indoor_data_plate', 'hatch_or_closet_measurement',
-    'panel_video', 'panel', 'panel_label', 'service_lines', 'return_grille',
+    'panel_video', 'panel', 'panel_label', 'main_panel', 'service_lines', 'return_grille',
     'walkthrough', 'water_heater', 'other')),
   kind text not null check (kind in ('photo', 'video')),
   storage_path text not null,         -- path in the job-media bucket
@@ -169,3 +169,5 @@ insert into public.contractors (name, home_zip) values ('Comfort Air Heating & A
 -- Added later (applied as migrations): panel video step, door opening measurements.
 -- alter table public.jobs add column door_width_in numeric, add column door_height_in numeric;
 -- job_media.step also allows 'panel_video' and 'door_width_measurement'.
+-- Also added: home_type, meter_at_panel, panel_type (guessed by guess_panel_type), panel_location 'meter_room',
+-- indoor/water heater/panel zones, supply/return locations, airflow_config (guess_airflow), equipment catalog tables.
