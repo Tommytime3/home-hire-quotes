@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { label, CONTACT_LABELS } from "../../lib/labels";
 import { Login, useSession } from "../../lib/auth";
+import { useContractor } from "../../lib/contractor";
 import { AdminShell } from "../../lib/AdminShell";
 
 type JobRow = {
@@ -33,6 +34,7 @@ function ago(iso: string | null) {
 
 export default function AdminHome() {
   const session = useSession();
+  const co = useContractor(!!session);
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [showDrafts, setShowDrafts] = useState(false);
 
@@ -43,14 +45,15 @@ export default function AdminHome() {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !co) return;
     supabase
       .from("jobs")
       .select("id,status,job_type,first_name,last_name,city,phone,submitted_at,created_at,contact_request,contact_pref,contact_requested_at")
+      .eq("contractor_id", co.id)
       .order("created_at", { ascending: false })
       .limit(200)
       .then(({ data }) => setJobs((data as JobRow[]) ?? []));
-  }, [session, tick]);
+  }, [session, tick, co]);
 
   if (session === undefined) return <AdminShell><p className="lead">Loading…</p></AdminShell>;
   if (!session) return <Login />;

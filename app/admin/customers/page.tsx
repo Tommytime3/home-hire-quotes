@@ -26,14 +26,15 @@ export default function CustomersPage() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !co) return;
     supabase
       .from("customers")
       .select("id,first_name,last_name,email,phone,street,city,zip,source,created_at,jobs(id,status)")
       .order("created_at", { ascending: false })
+      .eq("contractor_id", co.id)
       .limit(500)
       .then(({ data }) => setList((data as Customer[]) ?? []));
-  }, [session]);
+  }, [session, co]);
 
   async function create() {
     if (!co) return;

@@ -4,7 +4,14 @@ export const LABELS: Record<string, Record<string, string>> = {
     ducted_heat_pump: "Heating & AC system",
     ductless: "Ductless mini-split",
     heat_pump_water_heater: "Heat pump water heater",
+    attic_crawlspace: "Attic & crawlspace",
   },
+  attic_service: { rodent_proofing: "Rodent proofing", insulation: "Insulation", ductwork: "Ductwork", full_renovation: "Full attic & crawlspace makeover" },
+  rodent_signs: { droppings: "Droppings / chewed insulation", noises: "Noises", seen: "Seen rodents", none: "No signs" },
+  yes_no: { yes: "Yes", no: "No", unsure: "Not sure" },
+  crawl_access: { outside_door: "Door/vent outside", inside_hatch: "Hatch inside", no_access: "No access (needs a door)" },
+  duct_location: { attic: "Attic", crawlspace: "Crawlspace", both: "Attic + crawlspace", unsure: "Not sure" },
+  garage_attached: { yes: "Attached", no: "Detached", none: "No garage" },
   home_type: {
     single_family: "Single-family house",
     townhouse: "Townhouse",
@@ -58,6 +65,14 @@ export const ZONE_LABELS: Record<string, string> = {
 };
 
 export const STEP_LABELS: Record<string, string> = {
+  attic_wide: "Attic video",
+  attic_insulation: "Insulation depth",
+  rodent_signs: "Rodent signs",
+  attic_ducts: "Attic ducts",
+  crawl_wide: "Crawlspace video",
+  crawl_vents: "Crawlspace vents",
+  crawl_ducts: "Crawlspace ducts",
+  exterior_gaps: "Gaps and entry points",
   outdoor_unit: "Outdoor unit", outdoor_data_plate: "Outdoor label", line_set_route: "Line set route",
   indoor_unit: "Indoor unit", indoor_data_plate: "Unit / tank label", hatch_or_closet_measurement: "Opening measurement",
   door_width_measurement: "Door width", panel_video: "Panel video", panel: "Panel (door open)",

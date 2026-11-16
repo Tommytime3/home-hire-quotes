@@ -31,7 +31,16 @@ type Estimate = {
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 
 // Each step is real work done by the price estimate; the pacing just lets people read it.
-function stepsFor(city?: string) {
+function stepsFor(city?: string, jobType?: string) {
+  if (jobType === "attic_crawlspace") {
+    return [
+      "Reviewing your attic and crawlspace",
+      "Saving your photos and videos",
+      "Measuring insulation and duct runs",
+      "Building your package from our price book",
+      "Pricing your estimate",
+    ];
+  }
   return [
     "Reading your equipment label",
     "Saving your photos and videos",
@@ -66,8 +75,9 @@ function useCountdown(until?: string | null) {
 
 const shortDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: string; city?: string }) {
-  const steps = stepsFor(city);
+export function Finish({ jobId, firstName, city, jobType }: { jobId: string; firstName?: string; city?: string; jobType?: string }) {
+  const steps = stepsFor(city, jobType);
+  const energy = jobType !== "attic_crawlspace";
   const [shown, setShown] = useState(0);
   const [est, setEst] = useState<Estimate | null | undefined>(undefined);
   const [picked, setPicked] = useState<string | null>(null);
@@ -116,8 +126,9 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
   }
 
   const company = est?.company ?? "our team";
-  const specialist = est?.specialist ? `${est.specialist}, your rebate specialist` : "your rebate specialist";
-  const talkTo = est?.specialist ? `Talk to ${est.specialist}` : "Talk to a rebate specialist";
+  const role = energy ? "rebate specialist" : "project specialist";
+  const specialist = est?.specialist ? `${est.specialist}, your ${role}` : `your ${role}`;
+  const talkTo = est?.specialist ? `Talk to ${est.specialist}` : `Talk to a ${role}`;
   const hasRange = est && est.low != null && est.high != null;
   const same = hasRange && Math.abs(est!.high! - est!.low!) < 1;
   const afterRebate = hasRange && est!.rebate > 0 ? Math.max(0, est!.low! - est!.rebate) : null;
@@ -148,7 +159,9 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
             </p>
           ) : null}
           <p className="est-fine">
-            Includes permit and haul-away. Your exact, locked price comes after we look over your photos.
+            {energy
+              ? "Includes permit and haul-away. Your exact, locked price comes after we look over your photos."
+              : "Includes cleanup, sanitizing, and removal of old material. Your exact, locked price comes after we look over your photos."}
           </p>
         </section>
       ) : (
@@ -156,7 +169,7 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
       )}
 
       {/* Rebates: only real, published programs for their city */}
-      <section className="rebate-card">
+      {energy && <section className="rebate-card">
         <span className="est-cap">Your rebates{est?.utility ? `: ${est.utility}` : ""}</span>
         {est?.utility && est.rebate > 0 ? (
           <>
@@ -179,7 +192,7 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
             <p className="rebate-pitch">Many Bay Area utilities pay for switching to a heat pump. {est?.specialist || "Our rebate specialist"} will look up every rebate you qualify for and handle the paperwork.</p>
           </>
         )}
-      </section>
+      </section>}
 
       {bonus && (bonusLive || bonusEarned) && (
         <section className={`bonus ${bonusEarned ? "won" : ""}`}>
@@ -188,7 +201,7 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
           ) : (
             <>
               <p><b>🎁 {bonus.label} with your install</b> ({money(bonus.value)} installed value)</p>
-              <p className="bonus-sub">Talk with {est?.specialist || "our rebate specialist"} in the next <b className="clock">{left}</b> to claim it.</p>
+              <p className="bonus-sub">Talk with {est?.specialist || `our ${role}`} in the next <b className="clock">{left}</b> to claim it.</p>
             </>
           )}
         </section>
@@ -201,9 +214,9 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
       )}
 
       <section className="connect">
-        <h2 className="connect-h">{est?.specialist ? `${talkTo}, your rebate specialist` : talkTo}</h2>
+        <h2 className="connect-h">{est?.specialist ? `${talkTo}, your ${role}` : talkTo}</h2>
         <p className="connect-sub">
-          Get your exact price and every rebate you qualify for.
+          {energy ? "Get your exact price and every rebate you qualify for." : "Get your exact price and a walkthrough of what we see in your photos."}
           {est?.rebate_paid_to === "contractor" ? " We front your rebate, so the sooner you sign, the sooner we install and file it." : ""}
           {est?.rebate_reservation ? " Your rebate has to be reserved before install, and we file the reservation the day you sign." : ""}
         </p>
@@ -242,9 +255,19 @@ export function Finish({ jobId, firstName, city }: { jobId: string; firstName?: 
         <h2>What happens next</h2>
         <ol>
           <li className="done">Photos and answers received</li>
-          <li>{specialist.charAt(0).toUpperCase() + specialist.slice(1)} confirms your price and rebates</li>
-          <li>You pick Good, Better, or Best and sign</li>
-          <li>We pull the permit, install, and file your rebate</li>
+          {energy ? (
+            <>
+              <li>{specialist.charAt(0).toUpperCase() + specialist.slice(1)} confirms your price and rebates</li>
+              <li>You pick Good, Better, or Best and sign</li>
+              <li>We pull the permit, install, and file your rebate</li>
+            </>
+          ) : (
+            <>
+              <li>{specialist.charAt(0).toUpperCase() + specialist.slice(1)} confirms your price</li>
+              <li>You approve and sign</li>
+              <li>Our crew does the work. After rodent proofing, we come back weekly for the first month to check traps</li>
+            </>
+          )}
         </ol>
       </section>
     </main>

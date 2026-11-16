@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { isAvailable, setContractorCache, useContractor, Contractor } from "./contractor";
+import { isAvailable, setContractorCache, useContractor, useContractors, switchContractor, Contractor } from "./contractor";
 
 const TABS = [
   { href: "/admin", label: "Jobs", match: ["/admin", "/admin/job", "/admin/quote"] },
@@ -24,6 +24,7 @@ export function BrandMark({ size = 30 }: { size?: number }) {
 // Branded frame for every staff page. Uses the uploaded logo when there is one.
 export function AdminShell({ children, back }: { children: React.ReactNode; back?: { href: string; label: string } }) {
   const co = useContractor();
+  const list = useContractors();
   const [path, setPath] = useState("");
   const [avail, setAvail] = useState(false);
   useEffect(() => setAvail(isAvailable(co)), [co]);
@@ -58,6 +59,11 @@ export function AdminShell({ children, back }: { children: React.ReactNode; back
             )}
           </a>
           <div className="ca-bar-right">
+            {list && list.length > 1 && co && (
+              <select className="co-switch" value={co.id} onChange={(e) => switchContractor(e.target.value)} aria-label="Company">
+                {list.map((x) => <option key={x.id} value={x.id}>{x.display_name || x.name}</option>)}
+              </select>
+            )}
             {co && (
               <button
                 className={`avail ${avail ? "on" : ""}`}

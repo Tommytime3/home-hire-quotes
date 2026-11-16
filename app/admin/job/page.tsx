@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { label, STEP_LABELS, ZONE_LABELS, CONTACT_LABELS } from "../../../lib/labels";
 import { Login, useSession } from "../../../lib/auth";
+import { atticLines, linesAsText, PriceRow } from "../../../lib/atticQuote";
+import { useContractor } from "../../../lib/contractor";
 import { AdminShell } from "../../../lib/AdminShell";
 import { money, sizeMismatch } from "../../../lib/quote";
 
@@ -129,6 +131,9 @@ export default function JobPage() {
   const [media, setMedia] = useState<Media[]>([]);
   const [saving, setSaving] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
+  const [prices, setPrices] = useState<PriceRow[]>([]);
+  const [copied, setCopied] = useState(false);
+  const co = useContractor(!!session);
 
   useEffect(() => setId(new URLSearchParams(window.location.search).get("id")), []);
 
@@ -149,6 +154,10 @@ export default function JobPage() {
       setMedia(list);
       const { data: qs } = await supabase.from("quotes").select("id,status,options,updated_at").eq("job_id", id).order("updated_at", { ascending: false });
       setQuotes(qs ?? []);
+      if (data?.job_type === "attic_crawlspace") {
+        const { data: pr } = await supabase.from("price_book_items").select("code,price").eq("contractor_id", data.contractor_id);
+        setPrices((pr as PriceRow[]) ?? []);
+      }
     })();
   }, [session, id]);
 
@@ -168,9 +177,13 @@ export default function JobPage() {
   const name = [job.first_name, job.last_name].filter(Boolean).join(" ") || "Homeowner";
   const first = job.first_name || "there";
   const phoneDigits = String(job.phone ?? "").replace(/[^\d+]/g, "");
-  const smsBody = encodeURIComponent(`Hi ${first}, this is Tommy with Comfort Air. I got your photos and I'm putting your quote together now. Do you have a few minutes for a quick call?`);
-  const mailSubject = encodeURIComponent("Your Comfort Air quote");
-  const mailBody = encodeURIComponent(`Hi ${first},\n\nThanks for sending your photos and videos. I'm putting your quote together now and will have it to you shortly.\n\nTommy\nComfort Air Heating & Air Conditioning`);
+  const company = co?.display_name || co?.name || "our team";
+  const rep = co?.specialist_name || "Tommy";
+  const smsBody = encodeURIComponent(`Hi ${first}, this is ${rep} with ${company}. I got your photos and I'm putting your quote together now. Do you have a few minutes for a quick call?`);
+  const mailSubject = encodeURIComponent(`Your ${company} quote`);
+  const mailBody = encodeURIComponent(`Hi ${first},\n\nThanks for sending your photos and videos. I'm putting your quote together now and will have it to you shortly.\n\n${rep}\n${company}`);
+  const isAttic = job.job_type === "attic_crawlspace";
+  const attic = isAttic ? atticLines(job, prices) : null;
   const isHvac = job.job_type === "ducted_heat_pump" || job.job_type === "ductless";
   const isWh = job.job_type === "heat_pump_water_heater";
   const steps = Array.from(new Set(media.map((m) => m.step)));
@@ -206,7 +219,48 @@ export default function JobPage() {
         <p className="muted small">They saw an estimate of {money(job.estimate_low)}–{money(job.estimate_high)}{Number(job.estimate_rebate) > 0 ? `, ${money(job.estimate_rebate)} rebate` : ""}.</p>
       )}
 
-      <section className="card quote-card">
+      {isAttic && attic && (
+        <section className="card quote-card">
+          <div className="quote-card-head">
+            <h2>Estimate for Housecall Pro</h2>
+            <button className="btn" onClick={() => navigator.clipboard.writeText(linesAsText(attic.lines)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}>
+              {copied ? "Copied ✓" : "Copy line items"}
+            </button>
+          </div>
+          <p className="muted small">
+            Built from your price book{attic.footprint ? ` using ${attic.footprint.toLocaleString()} sq ft of attic/crawl space` : ""}{attic.runs ? ` and ${attic.runs} duct runs` : ""}. Check the photos, adjust quantities in Housecall Pro, and add any manager discount there.
+          </p>
+          <table className="hcp">
+            <thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead>
+            <tbody>
+              {attic.lines.map((l, i) => (
+                <tr key={i}>
+                  <td><b>{l.name}</b>{l.note && <small>{l.note}</small>}</td>
+                  <td>{l.qty.toLocaleString()}</td>
+                  <td>{money(l.unit)}</td>
+                  <td>{money(l.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td colSpan={3}>Subtotal</td><td>{money(attic.total)}</td></tr></tfoot>
+          </table>
+        </section>
+      )}
+
+      {isAttic && (
+        <section className="card">
+          <h2>What they told us</h2>
+          <Row k="Needs" v={label("attic_service", job.attic_service)} />
+          <Row k="Rodent signs" v={label("rodent_signs", job.rodent_signs)} />
+          <Row k="Attic" v={label("yes_no", job.has_attic)} />
+          <Row k="Crawlspace" v={[label("yes_no", job.has_crawlspace), job.crawl_access && label("crawl_access", job.crawl_access)].filter(Boolean).join(" · ")} />
+          {job.supply_register_count ? <Row k="Duct runs" v={`${job.supply_register_count} vents · ${label("duct_location", job.duct_location)}`} /> : null}
+          {job.garage_attached && <Row k="Garage" v={label("garage_attached", job.garage_attached)} />}
+          {job.notes && <Row k="Notes" v={job.notes} />}
+        </section>
+      )}
+
+      {!isAttic && <section className="card quote-card">
         <div className="quote-card-head">
           <h2>Quote</h2>
           <a className="btn" href={quotes.length ? `/admin/quote?id=${quotes[0].id}` : `/admin/quote?job=${job.id}`}>
@@ -221,9 +275,9 @@ export default function JobPage() {
             <span className="link-txt">View PDF →</span>
           </a>
         ))}
-      </section>
+      </section>}
 
-      <LabelCard job={job} onChange={(patch) => setJob({ ...job, ...patch })} />
+      {!isAttic && <LabelCard job={job} onChange={(patch) => setJob({ ...job, ...patch })} />}
 
       <div className="actions">
         <a className="act" href={`tel:${phoneDigits}`}>Call</a>
@@ -240,7 +294,7 @@ export default function JobPage() {
         <Row k="Sq ft / built" v={[job.square_feet && `${job.square_feet} sq ft`, job.year_built && `built ${job.year_built}`].filter(Boolean).join(" · ")} />
       </section>
 
-      <section className="card">
+      {!isAttic && <section className="card">
         <h2>Where things are</h2>
         <MiniMap marks={marks} />
         {isHvac && <Row k="Indoor unit" v={`${label("indoor_location", job.indoor_location)} · ${ZONE_LABELS[job.indoor_zone] ?? "—"}`} />}
@@ -257,9 +311,9 @@ export default function JobPage() {
         <Row k="Panel" v={`${label("panel_location", job.panel_location)} · ${ZONE_LABELS[job.panel_zone] ?? "—"}`} />
         {isHvac && <Row k="Steps outdoor → indoor" v={job.steps_condenser_to_indoor} />}
         <Row k={isWh ? "Steps water heater → panel" : "Steps indoor → panel"} v={job.steps_indoor_to_panel} />
-      </section>
+      </section>}
 
-      <section className="card">
+      {!isAttic && <section className="card">
         <h2>System clues</h2>
         <Row k="Panel type (guess)" v={`${label("panel_type", job.panel_type)} · ${label("meter_at_panel", job.meter_at_panel)}`} />
         <Row k="Service lines" v={label("service_lines", job.service_lines)} />
@@ -272,7 +326,7 @@ export default function JobPage() {
         )}
         {job.notes && <Row k="Notes" v={job.notes} />}
         <p className="tip">Guesses come from the homeowner's answers. Confirm them in the photos and videos below.</p>
-      </section>
+      </section>}
 
       {steps.length === 0 && <section className="card"><h2>Photos & videos</h2><p>Nothing uploaded.</p></section>}
       {steps.map((s) => (
